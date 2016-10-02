@@ -7,15 +7,16 @@ print("\n\n\nEXERCISE 2.1")
 -- initialize the days
 days = {Monday = 19, Tuesday = 21, Wednsday = 18, Thursday = 17, Friday = 19, Saturday = 23, Sunday = 20}
 
--- the large number should really be something like number.MAX_VALUE, but since the domain is temperatures, this should be fine
-lowest, highest, sum, count = 10000, 0, 0, 0 
+lowest, highest, sum, count = days["Monday"], days["Monday"], 0, 0 
 
 for key, value in pairs(days) do
 	if value > highest then
 		highest = value
+        highest_day = key
 	end
 	if value < lowest then
 		lowest = value
+        lowest_day = key
 	end
 	sum = sum + value
 	count = count + 1
@@ -23,9 +24,9 @@ end
 
 average = sum / count
 
-print("warmest", highest)
-print("coldest", lowest)
-print("average", average)
+print("warmest: ", highest_day)
+print("coldest: ", lowest_day)
+print("average: ", average)
 
 
 ---------------------------------------------
@@ -35,16 +36,16 @@ print("average", average)
 print("\n\n\nEXERCISE 2.2")
 
 t1 = {}
-t1["C1966820"]="John Doe"
-t1["C1965463"]="Homer Simpson"
-t1["C1987900"]="Jonnie Walker"
-t1["C2345820"]="Paul Smith"
+t1["C1966820"] = "John Doe"
+t1["C1965463"] = "Homer Simpson"
+t1["C1987900"] = "Jonnie Walker"
+t1["C2345820"] = "Paul Smith"
 
 t2 = {}
-t2["John Doe"]=26
-t2["Homer Simpson"]=40
-t2["Jonnie Walker"]=90
-t2["Paul Smith"]=30
+t2["John Doe"] = 26
+t2["Homer Simpson"] = 40
+t2["Jonnie Walker"] = 90
+t2["Paul Smith"] = 30
 
 function join_tables(t1, t2)
 	t3 = {}
@@ -88,7 +89,7 @@ end
 
 
 ---------------------------------------------
---Exercise 2.4: Tables as set
+--Exercise 2.4: Tables as Multiset
 ---------------------------------------------
 
 print("\n\n\nEXERCISE 2.3")
@@ -134,11 +135,22 @@ remove(multiset, "peach")
 remove(multiset, "peach")
 
 function is_elem(multiset, element) 
-	return multiset[element] != nil 
+    result = multiset[element] ~= nil 
+	return result
 end
 
-print(is_elem(multiset, "lemon")
-print(is_elem(multiset, "peach")
+print(is_elem(multiset, "lemon"))
+print(is_elem(multiset, "peach"))
+
+function count_elem(multiset, element)
+    if multiset[element] == nil then
+        return 0
+    else
+        return multiset[element]
+    end
+end
+
+print(count_elem(multiset, "lemon"))
 
 for key, value in pairs(multiset) do
 	print(key, value)
