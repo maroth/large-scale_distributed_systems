@@ -1,23 +1,30 @@
--- SPLAYschool tutorial
--- BASE libraries (threads, events, sockets, ...)
+require("splay.base")
+rpc = require("splay.rpc")
 
-require"splay.base"
-
--- RPC library
-
-rpc = require"splay.rpc"
+if not job then
+  -- can NOT be required in SPLAY deployments !
+  local utils = require("splay.utils")
+  if #arg < 2 then
+    print("lua "..arg[0].." my_position nb_nodes")
+    os.exit()
+  else
+    local pos, total = tonumber(arg[1]), tonumber(arg[2])
+    job = utils.generate_job(pos, total, 20001)
+  end
+end
 
 -- log
-local log = require"splay.log"
+local log = require("splay.log")
 local l_o = log.new(3, "[school]")
+
 -- accept incoming RPCs
 
 rpc.server(job.me.port)
 function call_me(position)
-log:print("I received an RPC from node "..position)
+    log:print("I received an RPC from node "..position)
 end
--- our main function
 
+-- our main function
 function SPLAYschool()
     local nodes = job.nodes()
     -- print bootstrap information about local node
@@ -36,11 +43,13 @@ function SPLAYschool()
     os.exit()
 end
 
+events.run(SPLAYSchool)
+
 -- create thread to execute the main function
-events.thread(SPLAYschool)
+-- events.thread(SPLAYschool)
 
 -- start the application
-events.loop()
+-- events.loop()
 
 -- now, you can watch the logs of your job and enjoy ;-)
 -- try this job with multiple splayds and different parameters
