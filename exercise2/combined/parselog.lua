@@ -67,6 +67,7 @@ function aggregate(tuples)
                 nodes_infected_by_rumor_mongering}
     table.insert(elements, element)
   end
+  print("duplicates: " .. duplicates)
   return elements
 end
 

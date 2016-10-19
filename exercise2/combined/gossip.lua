@@ -5,7 +5,7 @@
 -- For running on a Splay cluster
 -- By Markus Roth
 ------------------------------------
--- I wish this was Python
+-- I really wish this was Python
 ------------------------------------
 
 
@@ -22,13 +22,31 @@ do_anti_entropy = true
 -- gossip interval in seconds
 gossip_interval = 5  
 
--- when i get infected, send this number of infection messages to random partners
+-- gossip interval in seconds
+peer_sampling_interval = 5  
+
+-- when i get infected, send this number of infection messages to random peers
 -- only has effect when rumor mongering is active
 initial_hops_to_live = 5
 
--- how many partners do I infect after being infected?
+-- how many peers do I infect after being infected?
 -- only has effect when rumor mongering is active
 distribution_count = 3
+
+-- the size of the local view for the peer sampling algorithm (parameter c)
+peer_sampling_view_size = 5
+
+-- how many peers are exchanged each round by peer sampling
+peer_sampling_exchange_rate = 3
+
+-- how many of the oldest peers should be skipped (parameter h)
+peer_sampling_healer_parameter = 2
+
+-- how many
+peer_sampling_shuffler_parameter = 2
+
+-- peer selection policy for the peer sampling algorithm. Can be "rand" or "tail".
+peer_selection_policy = "rand"
 
 -- total running time
 max_time = 120 
@@ -70,7 +88,7 @@ rpc.server(job.me.port)
 
 
 ------------------------------------
--- variables
+-- Global Variables
 ------------------------------------
 
 -- am I infected already?
@@ -82,9 +100,242 @@ buffered = false
 -- if I am currently waiting to send, what is the hops_to_live value of the message I am going to send?
 buffered_hops_to_live = 0
 
+-- the local view of the peer sampling service
+-- items in it have the attributes "Age", "Peer", and "Id"
+local_view = {}
+
 
 ------------------------------------
--- helper functions 
+-- Peer Sampling Service
+------------------------------------
+
+-- the main peer sampling service loop
+function peer_sampling_periodic()
+  while true do
+    events.sleep(peer_sampling_interval)
+    local peer = select_peer()
+    local to_send = select_to_send()
+    local received_peers = rpc.call(peer, {'peer_sampling_receive', to_send, job.position})
+    local_view = select_to_keep(received_peers)
+    increate_local_view_age()
+  end
+end
+
+
+-- increase the age of each element of the local view by one
+function increase_local_view_age() 
+  for _, peer in pairs(local_view) do
+    peer["Age"] = peer["Age"] + 1
+  end
+end
+
+
+function peer_sampling_receive(received_peers, sender_position)
+  debug(job.position .. " received peers from " .. sender_position)
+  local result = select_to_send(local_view)
+  local_view = select_to_keep(received_peers)
+  return result
+end
+
+
+function select_peer()
+  if peer_selection_policy == "rand" then
+    return random_peer_in_local_view()
+  elseif peer_selection_policy = "tail" then
+    return oldest_peer_in_local_view()
+  end
+end
+
+
+function select_to_send()
+  local to_send = {}
+
+  -- sort local_view so we can easily discard the last h elements
+  table.sort(local_view, compare_by_age)
+
+  -- once local_view is sorted by age, we can just take all elements except for the last h
+  -- that measn the items from index 1 to index (size of local_view - h)
+  to_send = table.unpack(local_view, 1, #local_view - peer_sampling_healer_parameter)
+
+  -- add self to to_send and shuffle it
+  shuffle(to_send)
+  table.insert(to_send, {job.me, 0})
+
+  return to_send
+end
+
+
+function select_to_keep(received_peers)
+  -- merge the received peers with the local view
+  -- but if the item is already present, don't add it again
+  for _, peer in received_peers do
+    local already_present = false
+    for _, local_peer in local_view do
+      if peers_equal(peer["Peer"], local_peer["Peer"]) then
+        already_present = true
+      end
+    end
+    if not already_present then
+      table.insert(local_view, peer)
+    end
+  end
+
+  -- remove the oldest items from local view
+  local items_to_remove = math.min(peer_sampling_healer_parameter, #local_view - peer_sampling_view_size)
+  --TODO
+
+  -- remove the head items from local view
+  items_to_remove = math.min(peer_sampling_shuffler_parameter, #local_view - peer_sampling_view_size)
+  --TODO
+
+  -- reduce size of local view to target size by removing random items
+  items_to_remove = math.max(0, #local_view - peer_sampling_view_size)
+  --TODO
+end
+
+
+-- are two peers equal regarding to ip address and port?
+function peers_equal(peer1, peer2)
+  --TODO
+end
+
+
+function random_peer_in_local_view() 
+  return local_view[math.random(#local_view)]
+end
+
+function oldest_peer_in_local_view()
+  local oldest_age = 0
+  local oldest_peer = {}
+  for _, peer in pairs(local_view) do
+    if peer["Age"] < oldest_age then
+      oldest_peer = peer
+      oldest_age = peer["Age"]
+    end
+  end
+  return oldest_peer
+end
+
+function compare_by_age(peer1, peer2) 
+  return peer1["Age"] < peer2["Age"] 
+end
+
+
+
+------------------------------------
+-- Anti Entropy
+------------------------------------
+
+-- repeadedly find a random peer, and exchange the infected state with them
+-- if either of the peers are infected before, both are infected after
+function anti_entropy_periodic()
+  while true do
+    events.sleep(gossip_interval)
+    local exchange_peer_position = find_random_peer()
+    debug(job.position .. " <--anti-entropy--> " .. exchange_peer_position)
+    local exchange_peer = job.nodes[exchange_peer_position]
+    local peer_is_infected = rpc.call(exchange_peer, {'anti_entropy_infect', infected, job.position})
+
+    -- if the peer is infected, but I am not yet infected, then I have now become infected
+    if peer_is_infected and not infected then
+      debug('Position ' .. job.position .. ' got anti-entropy infected by ' .. exchange_peer_position)
+      logS("i_am_infected_by_anti_entropy")
+      infected = true
+    end
+  end
+end
+
+
+-- RPC call that gets called remotely by anti_entropy_periodic()
+-- called to check if the node is infeced, and infects the node if the caller is infected
+function anti_entropy_infect(caller_is_infected, sender_position)
+  -- if the person calling me is infected, and I am not yet infected, then I am now infected
+  if caller_is_infected and not infected then
+    logS("i_am_infected_by_anti_entropy")
+    debug('Position ' .. job.position .. ' got anti-entropy infected by ' .. sender_position)
+    infected = true
+  end
+  return infected
+end
+
+
+-- select a random peer to exchange with
+-- require that this peer is not oneself
+function find_random_peer()
+  local exchange_peer_position = 0
+  repeat
+    exchange_peer_position = math.random(#job.nodes)
+  until exchange_peer_position ~= job.position
+  return exchange_peer_position
+end
+
+
+------------------------------------
+-- Rumor Mongering
+------------------------------------
+
+-- repeatedly check if there is a message buffered
+-- if there is, select a number of random exchange peers
+-- and send them the message
+function rumor_mongering_periodic()
+  while true do
+    events.sleep(gossip_interval)
+    if buffered then
+      exchange_peer_positions = find_random_peers()
+      for exchange_peer_position, _ in pairs(exchange_peer_positions) do
+        exchange_peer = job.nodes[exchange_peer_position]
+        rpc.call(exchange_peer, {'rumor_mongering_infect', buffered_hops_to_live, job.position})
+        debug(job.position .. " <--rumor-mongering--> " .. exchange_peer_position)
+      end
+      buffered = false
+    end
+  end
+end
+
+
+-- RPC call that can be use to infect this node
+-- if the node is not already infected, it becomes infected
+-- if the node is not already buffering, it starts to buffer sending a message
+-- if the node is already buffering, it takes the max hops_to_live from what it 
+-- already has and what is gets from the current message
+function rumor_mongering_infect(hops_to_live, sender_position)
+  if not infected then
+    logS("i_am_infected_by_rumor_mongering")
+    debug('Position ' .. job.position .. ' got infected by ' .. sender_position)
+    infected = true
+  else
+    debug('Position ' .. job.position .. ' received duplicate from ' .. sender_position)
+    logS("duplicate_received")
+  end
+  if not buffered or buffered and hops_to_live - 1 > buffered_hops_to_live then
+    buffered_hops_to_live = hops_to_live - 1
+    if buffered_hops_to_live > 0 then
+      buffered = true
+    end
+  end
+end
+  
+
+-- select a number random peers to exchange with
+-- require that none of these peers is not oneself
+-- and that every peer occurs only once
+-- P.S. LUA is not a very expressive language... This would be one line in Python
+function find_random_peers()
+  local exchange_peer_positions = {}
+  local found_peers = 0
+  repeat
+    repeat
+      exchange_peer_position = math.random(#job.nodes)
+    until (exchange_peer_position ~= job.position and (not exchange_peer_positions[exchange_peer_position]))
+    exchange_peer_positions[exchange_peer_position] = true
+    found_peers = found_peers + 1
+  until found_peers == distribution_count
+  return exchange_peer_positions
+end
+
+
+------------------------------------
+-- Helper Functions 
 ------------------------------------
 
 -- print debug message if debug flag is set
@@ -103,116 +354,24 @@ function terminator()
 end
 
 
-------------------------------------
--- anti entropy
-------------------------------------
+-- swap two items in a table
+-- from: http://stackoverflow.com/questions/17119804/lua-array-shuffle-not-working
+function swap(array, index1, index2)
+  array[index1], array[index2] = array[index2], array[index1]
+end
 
--- repeadedly find a random partner, and exchange the infected state with them
--- if either of the partners are infected before, both are infected after
-function anti_entropy_periodic()
-  while true do
-    events.sleep(gossip_interval)
-    local exchange_partner_position = find_random_partner()
-    debug(job.position .. " <--anti-entropy--> " .. exchange_partner_position)
-    local exchange_partner = job.nodes[exchange_partner_position]
-    local partner_is_infected = rpc.call(exchange_partner, {'anti_entropy_infect', infected, job.position})
 
-    -- if the partner is infected, but I am not yet infected, then I have now become infected
-    if partner_is_infected and not infected then
-      debug('Position ' .. job.position .. ' got anti-entropy infected by ' .. exchange_partner_position)
-      logS("i_am_infected_by_anti_entropy")
-      infected = true
-    end
+-- shuffle an array
+-- from: http://stackoverflow.com/questions/17119804/lua-array-shuffle-not-working
+function shuffle(array)
+  local counter = #array
+  while counter > 1 do
+    local index = math.random(counter)
+    swap(array, index, counter)
+    counter = counter - 1
   end
 end
 
-
--- RPC call that gets called remotely by anti_entropy_periodic()
--- called to check if the node is infeced, and infects the node if the caller is infected
-function anti_entropy_infect(caller_is_infected, senderPosition)
-  -- if the person calling me is infected, and I am not yet infected, then I am now infected
-  if caller_is_infected and not infected then
-    logS("i_am_infected_by_anti_entropy")
-    debug('Position ' .. job.position .. ' got anti-entropy infected by ' .. senderPosition)
-    infected = true
-  end
-  return infected
-end
-
-
--- select a random partner to exchange with
--- require that this partner is not oneself
-function find_random_partner()
-  local exchange_partner_position = 0
-  repeat
-    exchange_partner_position = math.random(#job.nodes)
-  until exchange_partner_position ~= job.position
-  return exchange_partner_position
-end
-
-
-------------------------------------
--- rumor mongering
-------------------------------------
-
--- repeatedly check if there is a message buffered
--- if there is, select a number of random exchange partners
--- and send them the message
-function rumor_mongering_periodic()
-  while true do
-    events.sleep(gossip_interval)
-    if buffered then
-      exchange_partner_positions = find_random_partners()
-      for exchange_partner_position, _ in pairs(exchange_partner_positions) do
-        exchange_partner = job.nodes[exchange_partner_position]
-        rpc.call(exchange_partner, {'rumor_mongering_infect', buffered_hops_to_live, job.position})
-        debug(job.position .. " <--rumor-mongering--> " .. exchange_partner_position)
-      end
-      buffered = false
-    end
-  end
-end
-
-
--- RPC call that can be use to infect this node
--- if the node is not already infected, it becomes infected
--- if the node is not already buffering, it starts to buffer sending a message
--- if the node is already buffering, it takes the max hops_to_live from what it 
--- already has and what is gets from the current message
-function rumor_mongering_infect(hops_to_live, senderPosition)
-  if not infected then
-    logS("i_am_infected_by_rumor_mongering")
-    debug('Position ' .. job.position .. ' got infected by ' .. senderPosition)
-    infected = true
-  else
-    debug('Position ' .. job.position .. ' received duplicate from ' .. senderPosition)
-    logS("duplicate_received")
-  end
-  if not buffered or buffered and hops_to_live - 1 > buffered_hops_to_live then
-    buffered_hops_to_live = hops_to_live - 1
-    if buffered_hops_to_live > 0 then
-      buffered = true
-    end
-  end
-end
-  
-
--- select a number random partners to exchange with
--- require that none of these partners is not oneself
--- and that every partner occurs only once
--- P.S. LUA is not a very expressive language... This would be one line in Python
-function find_random_partners()
-  local exchange_partner_positions = {}
-  local found_partners = 0
-  repeat
-    repeat
-      exchange_partner_position = math.random(#job.nodes)
-    until (exchange_partner_position ~= job.position and (not exchange_partner_positions[exchange_partner_position]))
-    exchange_partner_positions[exchange_partner_position] = true
-    found_partners = found_partners + 1
-  until found_partners == distribution_count
-  return exchange_partner_positions
-end
 
 
 ------------------------------------
