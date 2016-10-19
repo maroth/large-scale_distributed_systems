@@ -46,6 +46,7 @@ end
 --parse timestamp strings with the format "2016-10-16 14:33:41"
 function parse_timestamp(timestamp)
     local pattern = "(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+).(%d+)"
+    print(timestamp)
     local xyear, xmonth, xday, xhour, xminute, xseconds, xmillis = timestamp:match(pattern)
     local convertedTimestamp = os.time({year = xyear, month = xmonth, day = xday, hour = xhour, min = xminute, sec = xseconds})
     return convertedTimestamp
@@ -53,15 +54,20 @@ end
 
 -- aggregate the elements read from the log file
 function aggregate(number_of_nodes, tuples)
-    elements = {}
-    starting_time = tuples[1]["ParsedTime"]
-    absolute_infected_nodes = 0
+    local elements = {}
+    local starting_time = tuples[1]["ParsedTime"]
+    local absolute_infected_nodes = 0
+    local duplicates = 0
     for i, tuple in ipairs(tuples) do
         relative_time = tuple["ParsedTime"] - starting_time
-        absolute_infected_nodes = absolute_infected_nodes + 1
-        relative_infected_nodes = absolute_infected_nodes / number_of_nodes
-	element = {relative_time, absolute_infected_nodes, relative_infected_nodes}
-	table.insert(elements, element)
+        if tuple["Message"] == "i_am_infected" then
+          absolute_infected_nodes = absolute_infected_nodes + 1
+          relative_infected_nodes = absolute_infected_nodes / number_of_nodes
+        else 
+          duplicates = duplicates + 1
+        end
+        element = {relative_time, absolute_infected_nodes, relative_infected_nodes, duplicates}
+        table.insert(elements, element)
     end
     return elements
 end
@@ -74,7 +80,8 @@ function save_files(elements)
         relative_time = element[1]
         absolute_infected_nodes = element[2]
         relative_infected_nodes = element[3]
-        line = relative_time .. " " .. absolute_infected_nodes .. " " .. relative_infected_nodes .. "\n"
+        duplicates = element[4]
+        line = relative_time .. " " .. absolute_infected_nodes .. " " .. relative_infected_nodes .. " " .. duplicates .. "\n"
         file:write(line)
     end
     file:close()
