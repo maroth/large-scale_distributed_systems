@@ -22,13 +22,11 @@ end
 -- split the lines in the log file and assign the values to tuples
 function tuples_from_lines(lines)
     local tuples = {}
-    local number_of_nodes = 0
     local fields = {"Date", "Timestamp", "Node", "Message"}
     for i, line in ipairs(lines) do
-        if #line > 1 and string.find(line, "i_am_infected") then
+        if #line > 1 and string.find(line, "i_am_infected") or string.find(line, "duplicate_received") then
             local tuple = {}
             local count = 1
-            number_of_nodes = number_of_nodes + 1
             for element in string.gmatch(line, "%S+") do
                 if fields[count] == "Node" then
                     element = tonumber(string.sub(element, 2, -2))
@@ -40,20 +38,19 @@ function tuples_from_lines(lines)
         tuples[i] = tuple
         end
     end
-    return number_of_nodes, tuples
+    return tuples
 end
 
 --parse timestamp strings with the format "2016-10-16 14:33:41"
 function parse_timestamp(timestamp)
     local pattern = "(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+).(%d+)"
-    print(timestamp)
     local xyear, xmonth, xday, xhour, xminute, xseconds, xmillis = timestamp:match(pattern)
     local convertedTimestamp = os.time({year = xyear, month = xmonth, day = xday, hour = xhour, min = xminute, sec = xseconds})
     return convertedTimestamp
 end
 
 -- aggregate the elements read from the log file
-function aggregate(number_of_nodes, tuples)
+function aggregate(tuples)
     local elements = {}
     local starting_time = tuples[1]["ParsedTime"]
     local absolute_infected_nodes = 0
@@ -125,9 +122,9 @@ end
 
 table.print = print_r
  
-
+number_of_nodes = 40
 lines = lines_from("cluster_result_log.txt")
-number_of_nodes, tuples = tuples_from_lines(lines)
-aggregate = aggregate(number_of_nodes, tuples)
-save_files(elements)
+tuples = tuples_from_lines(lines)
+aggregate = aggregate(tuples)
+save_files(aggregate)
 
