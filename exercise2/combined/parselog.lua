@@ -7,7 +7,7 @@ function parse(lines)
   local tuples = {}
 
   --names for the different numbers we have in the log file
-  local fields = {"Date", "Timestamp", "Node", "Message"}
+  local fields = {"Date", "Timestamp", "Node", "Cycle", "Message"}
 
   for i, line in ipairs(lines) do
     local tuple = {}
@@ -33,6 +33,7 @@ end
 
 -- aggregate the elements read from the log file
 function aggregate(tuples)
+  table.sort(tuples, function(tuple1, tuple2) return tuple1["Cycle"] < tuple2["Cycle"] end)
   local elements = {}
   local starting_time = tuples[1]["ParsedTime"]
   local absolute_infected_nodes = 0
@@ -41,6 +42,8 @@ function aggregate(tuples)
   local duplicates = 0
   for i, tuple in ipairs(tuples) do
     relative_time = tuple["ParsedTime"] - starting_time
+
+    cycles = tuple["Cycle"]
 
     if string.starts(tuple["Message"], "i_am_infected") then
       absolute_infected_nodes = absolute_infected_nodes + 1
@@ -60,6 +63,7 @@ function aggregate(tuples)
     end
 
     element = {relative_time, 
+                cycles,
                 absolute_infected_nodes, 
                 relative_infected_nodes, 
                 duplicates, 
@@ -174,4 +178,3 @@ lines = read_lines_from_file("log.txt")
 tuples = parse(lines)
 aggregated_tuples  = aggregate(tuples)
 save_file(aggregated_tuples, "aggregated_log.txt")
-

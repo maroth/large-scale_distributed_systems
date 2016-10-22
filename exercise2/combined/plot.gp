@@ -25,11 +25,11 @@ set key top left
 set yrange [0:] # example of a closed range (points outside will not be displayed)
 set xrange [0:] # example of a range closed on one side only, the max will determined automatically
 
-plot "aggregated_log.txt" u ($1):($2) with lines linestyle 3 title "infected nodes", \
-     "aggregated_log.txt" u ($1):($5) with lines linestyle 4 title "infected by anti-entropy", \
-     "aggregated_log.txt" u ($1):($6) with lines linestyle 5 title "infected by rumor mongering"
+plot "aggregated_log.txt" u ($2):($3) with lines linestyle 3 title "infected nodes", \
+     "aggregated_log.txt" u ($2):($6) with lines linestyle 4 title "infected by anti-entropy", \
+     "aggregated_log.txt" u ($2):($7) with lines linestyle 5 title "infected by rumor mongering"
 
-     # "aggregated_log.txt" u ($1):(100*$3) with lines linestyle 1 title "% infected nodes", \
-     # "aggregated_log.txt" u ($1):($4) with lines linestyle 2 title "duplicate messages", \
+     # "aggregated_log.txt" u ($2):(100*$4) with lines linestyle 1 title "% infected nodes", \
+     # "aggregated_log.txt" u ($2):($5) with lines linestyle 2 title "duplicate messages", \
 
 # $1 is column 1. You can do arithmetics on the values of the columns
