@@ -1,0 +1,15 @@
+2016-10-24 16:06:16.338689 (18)  	0 i_am_infected_as_patient_zero
+2016-10-24 16:06:21.348536 (39)  	0 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:21.353064 (170)  	1 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:22.965381 (113)  	0 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:22.970365 (150)  	0 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:24.672263 (41)  	1 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:24.677613 (22)  	2 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:24.972311 (37)  	1 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:24.976962 (22)  	2 duplicate_received
+2016-10-24 16:06:25.14612 (168)  	1 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:25.19327 (167)  	1 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:26.768355 (168)  	1 duplicate_received
+2016-10-24 16:06:26.771005 (55)  	1 i_am_infected_by_rumor_mongering
+2016-10-24 16:06:29.112913 (39)  	2 duplicate_received
+2016-10-24 16:06:29.115037 (55)  	2 duplicate_received

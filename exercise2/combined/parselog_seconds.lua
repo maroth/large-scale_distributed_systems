@@ -24,7 +24,9 @@ function parse(lines)
       end
 
       -- to parse the datetime field, we need to combine the Date and Timestamp fields
-      tuple["ParsedTime"] = parse_timestamp(tuple["Date"] .. " " .. tuple["Timestamp"])
+      time, millis = parse_timestamp(tuple["Date"] .. " " .. tuple["Timestamp"])
+      tuple["ParsedTime"] = time
+      tuple["Millis"] = millis
 
       table.insert(tuples, tuple)
     end
@@ -32,30 +34,73 @@ function parse(lines)
   return tuples
 end
 
-function compare_by_cycle(t1, t2)
-  local t1_cycle = tonumber(t1["Cycle"])
-  local t2_cycle = tonumber(t2["Cycle"])
-  if t1_cycle == t2_cycle then
-    result = t1["ParsedTime"] < t2["ParsedTime"]
-    return result
+function compare_by_second(t1, t2)
+  local t1_second = t1["ParsedTime"]
+  local t2_second = t2["ParsedTime"]
+  local result = 0
+  if t1_second == t2_second then
+      local t1_millis = t1["Millis"]
+      local t2_millis = t2["Millis"]
+      result = t1_millis < t2_millis
+      print(t1_millis, t2_millis, result)
   else
-    local result = t1_cycle < t2_cycle
-    return result
+      result = t1_second < t2_second
   end
+  return result
+end
+
+function compare_by_relative_time(t1, t2)
+  local t1_second = t1["relative_time"]
+  local t2_second = t2["relative_time"]
+  return t1_second < t2_second
+end
+
+function time_diff(t1, t2)
+  local t1_second = t1["ParsedTime"]
+  local t2_second = t2["ParsedTime"]
+  local t1_millis = t1["Millis"]
+  local t2_millis = t2["Millis"]
+  local result = t1_second - t2_second
+  local diffmillis = t1_millis - t2_millis
+  return result, diffmillis
 end
 
 -- aggregate the elements read from the log file
 function aggregate(tuples)
-  table.sort(tuples, compare_by_cycle)
+  table.sort(tuples, compare_by_second)
+
+  local p = tuples[1]
+  for _, s in ipairs(tuples) do
+    if s["ParsedTime"] <= p["ParsedTime"] then
+      if s["Millis"] <= p["Millis"] then
+          print("fail")
+          table.print(p)
+          table.print(s)
+      end
+    end
+    p = s
+  end
+
+  local starting_time = tuples[1]
+
+  for _, tuple in ipairs(tuples) do
+    local relative_time, diffmillis = time_diff(tuple, starting_time)
+    relative_time = relative_time * 1000000
+    relative_time = relative_time + diffmillis
+    relative_time = relative_time / 1000000
+    tuple["relative_time"] = relative_time
+  end
+
+  table.sort(tuples, compare_by_relative_time)
+
 
   local elements = {}
-  local starting_time = tuples[1]["ParsedTime"]
   local absolute_infected_nodes = 0
   local nodes_infected_by_anti_entropy = 0
   local nodes_infected_by_rumor_mongering = 0
   local duplicates = 0
-  for _, tuple in pairs(tuples) do
-    relative_time = tuple["ParsedTime"] - starting_time
+  for _, tuple in ipairs(tuples) do
+    relative_time = tuple["relative_time"]
 
     cycles = tuple["Cycle"]
 
@@ -94,7 +139,7 @@ function save_file(elements, filename)
   file = io.open(filename, "w")
   for i, element in ipairs(elements) do
     local line = ""
-    for entry in pairs(element) do
+    for entry in ipairs(element) do
       line = line .. " " .. element[entry]
     end
     line = line .. "\n"
@@ -112,8 +157,8 @@ end
 function parse_timestamp(timestamp)
   local pattern = "(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+).(%d+)"
   local xyear, xmonth, xday, xhour, xminute, xseconds, xmillis = timestamp:match(pattern)
-  local convertedTimestamp = os.time({year = xyear, month = xmonth, day = xday, hour = xhour, min = xminute, sec = xseconds})
-  return convertedTimestamp
+  local convertedTimestamp = os.time({year = xyear, month = xmonth, day = xday, hour = xhour, min = xminute, sec = xseconds, millis=xmillis})
+  return convertedTimestamp, xmillis
 end
 
 
@@ -191,4 +236,4 @@ number_of_nodes = 40
 lines = read_lines_from_file(arg[1])
 tuples = parse(lines)
 aggregated_tuples  = aggregate(tuples)
-save_file(aggregated_tuples, "aggregated_" .. arg[1])
+save_file(aggregated_tuples, "aggregated_" .. arg[1] .. "_seconds")

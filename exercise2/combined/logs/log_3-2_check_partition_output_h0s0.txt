@@ -1,0 +1,2 @@
+The network is not connected!
+The following 1 nodes are not connected: 48 

@@ -1,13 +1,16 @@
 \documentclass[a4paper]{article}
+\nonstopmode
 
 \usepackage{listings}
 \usepackage[T1]{fontenc}
 \usepackage{color}
 \usepackage{pxfonts}
+\usepackage{pdfpages}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
 \definecolor{mauve}{rgb}{0.58,0,0.82}
+
 
 \lstset{frame=tb,
     aboveskip=3mm,
@@ -30,7 +33,10 @@
 \author{Markus Roth}
 
 \begin{document}
+
 \maketitle
+
+\tableofcontents
 
 \section{Solution Overview}
 
@@ -45,7 +51,7 @@ This is the program that runs the experiements. If follows the provided skeleton
 
 \subsection{parselog.lua}
 
-This LUA-script reads a log file created by running an experiment and aggragates the log entries to be able to parse them. It reads from log.txt and writes to aggregated\textunderscore log.txt. The aggregated log file contains the following columns:
+This LUA-script reads a log file created by running an experiment and aggragates the log entries to be able to parse them. It reads from the file named in its first parameter and writes to the same filename with a prefix of aggregated\textunderscore . The aggregated log file contains the following columns:
 
 \begin{enumerate}
 \item relative\textunderscore time: The number of seconds passed from the start of the experiment
@@ -56,28 +62,292 @@ This LUA-script reads a log file created by running an experiment and aggragates
 \item nodes\textunderscore infected\textunderscore by\textunderscore rumor\textunderscore mongering: The cumulative number of nodes infected by the rumor mongering prodocol.
 \end{enumerate}
 
-\subsection{plot.gp}
+\subsection{parselog.lua}
 
-This gnuplot script reads from aggregated\textunderscore log.txt and produces a PNG file of the graph. The resulting image is stored as plot.png
+The same as parselog.lua, but sorts the entries by their relative time values rather than their cycles. Used for the second-plots.
+
+\subsection{/plots}
+
+These gnuplot scripts read from aggregated log files produced by parselog.lua. They produces a .tex files of the graphs in the /plots directory. These .tex files are then embedded in this report via latex includes.
+
+There are many adaptions of the script used for this report. For each exercise, the script exists named after the exercise number and the parameters used.
+
+Note that I plotted the graphs with cycles in the x axis. This is because we were asked to do so in the lab session. Since I think plots with seconds are more legible, I added them at some places as well.
+
+The resulting .tex files are also included in the submission.
 
 \section{Task 2.1.1}
+
+Running gossip.lua with this configuration does what is required:
+
 \begin{lstlisting}
 ---START CONFIG SECTION---
 do_anti_entropy = true
-do_rumor_mongering = false
-do_peer_sampling = false
-
--- gossiping period should be 5 seconds
 gossip_interval = 5
-
--- end the simulation after 20 cycles
-max_cycles = 20
-
--- start anti-entropy immediately
-start_gossipping_after_cycles = 0
+max_cycles = 10
 --END CONFIG SECTION---
 \end{lstlisting}
 
+\section{Task 2.1.2}
 
+Running the code from section 2.1.1 on 40 peers on the splay cluster gives the following log:
+\begin{lstlisting}
+2016-10-24 13:55:02.972688 (92)     0 i_am_infected_as_patient_zero
+2016-10-24 13:55:07.981443 (19)     0 i_am_infected_by_anti_entropy
+2016-10-24 13:55:09.988781 (130)    1 i_am_infected_by_anti_entropy
+2016-10-24 13:55:11.952454 (3)      1 i_am_infected_by_anti_entropy
+2016-10-24 13:55:12.984608 (76)     1 i_am_infected_by_anti_entropy
+2016-10-24 13:55:13.344219 (166)    2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:13.456906 (56)     1 i_am_infected_by_anti_entropy
+2016-10-24 13:55:13.546528 (41)     2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:14.211685 (150)    2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:14.968156 (168)    2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:15.438669 (171)    2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:15.577630 (96)     2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:15.781953 (58)     2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:16.358811 (115)    2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:16.738897 (167)    2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:16.984977 (112)    2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:17.197953 (113)    2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:17.365741 (38)     3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:17.605150 (77)     3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:17.682568 (40)     3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:17.738057 (151)    3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:17.986358 (78)     2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:18.346416 (20)     2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:18.458532 (18)     2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:18.550194 (55)     2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:19.214494 (22)     2 i_am_infected_by_anti_entropy
+2016-10-24 13:55:19.366339 (129)    3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:19.593522 (132)    3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:20.190240 (1)      3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:20.559921 (57)     3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:20.579709 (114)    3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:20.768034 (74)     3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:20.796862 (149)    3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:21.185359 (111)    3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:21.331993 (169)    3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:21.552212 (75)     3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:21.887625 (39)     3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:21.911745 (95)     3 i_am_infected_by_anti_gntropy
+2016-10-24 13:55:22.369056 (133)    3 i_am_infected_by_anti_entropy
+2016-10-24 13:55:25.245777 (148)    4 i_am_infected_by_anti_entropy
+\end{lstlisting}
+
+As we can see, dissemination is complete after around 4 cycles. Not included: Final messages by all nodes saying that they are indeed infected.
+
+\section{Task 2.1.3}
+
+The script for parsing logs can be found in the file parselog.lua.
+
+\section{Task 2.1.4}
+
+\begin{figure}
+    \input{plots/plot_2-1-4.tex}
+    \caption{Task 2.1.4: Anti-Entropy dissemination with 40 peers}
+    \label{fig:2-1-4}
+\end{figure}
+
+The gnuplot script can be found in the file plot.gp. It might be modied in details to produce the various graphs in this report, but in general it remains the same.
+
+Applying the script to the data gained in task 2.1.2, we get plot show in figure \ref{fig:2-1-4}.
+
+\section{Task 2.2.1}
+\begin{lstlisting}
+---START CONFIG SECTION---
+do_rumor_mongering = true
+gossip_interval = 5
+initial_hops_to_live = 3
+distribution_count = 2
+max_cycles = 5
+---END CONFIG SECTION---
+\end{lstlisting}
+
+
+\begin{figure}
+    \input{plots/plot_2-2-1.tex}
+    \caption{Task 2.2.1: Rumor Mongering dissemination with 40 peers (HTL=3, f=2)}
+    \label{fig:2-2-1}
+\end{figure}
+
+The results of the experiment can be found in \ref{fig:2-2-1}. As we can see, 12 nodes were infected and two duplicates received, leading to the expected number of 14 recipients of a rumor. Since the cycles are not aligned, calls tend to move from cycle n to cyle n-1, because cycle n-1 runs first. This is the reason we see all infection shappen within cycles 0 to 3, rather than the last infections only happening in cycle 3.
+
+
+\section{Task 2.2.2}
+
+The log of Task 2.2.1 lists the incoming messages by rumor mongering:
+
+\lstinputlisting{logs/log_2-2-1.txt}
+
+Again we note that the cycles are not aligned, so we see the infections happing in an earlier cycle than they have been issued.
+
+\section{Task 2.2.3}
+
+\begin{figure}
+    \input{plots/plot_2-2-3.tex}
+    \caption{Task 2.2.3: Comparison of f and HTL values for Rumor Mongering (40 peers)}
+    \label{fig:2-2-3}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_2-2-3_seconds.tex}
+    \caption{Task 2.2.3: Comparison of f and HTL values for Rumor Mongering (40 peers)}
+    \label{fig:2-2-3_seconds}
+\end{figure}
+
+Modyfing the initial\textunderscore hops\textunderscore to\textunderscore live and distribution\textunderscore count variables in the config section above, I examined some values of f and HTL. The results can be seen in figure \ref{fig:2-2-3}.
+
+It seems to reach all my nodes, I need the parameter f to be at least 4 with HTL around 5.
+
+For better readability, I also plotted the graph using seconds in the x axis. This plit is in figure \ref{fig:2-2-3_seconds}.
+
+\section{Task 2.2.4}
+
+The contained scripts parselog.lua and the various plot scrips are able to plot total infections and infections by type of infection. The log outputs both values, and the plot script decides which to plot.
+
+\section{Task 2.3}
+
+\begin{figure}
+    \input{plots/plot_2-3.tex}
+    \caption{Task 2.3: Comparison of Anti-entropy and Rumor Mongering on 40 peers}
+    \label{fig:2-3}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_2-3_seconds.tex}
+    \caption{Task 2.3: Comparison of Anti-entropy and Rumor Mongering on 40 peers}
+    \label{fig:2-3_seconds}
+\end{figure}
+
+To show a comparison of the different infection methods, I use the following configuration:
+
+\begin{lstlisting}
+---START CONFIG SECTION---
+do_rumor_mongering = true
+do_anti_entropy = true
+gossip_interval = 5
+initial_hops_to_live = 3
+distribution_count = 2
+max_cycles = 20
+start_gossipping_after_cycles = 0
+---END CONFIG SECTION---
+\end{lstlisting}
+
+The resulting plot can be seen in figure \ref{fig:2-3}. There were 4 duplicates in the Rumor Mongering. I also plotted the graph with seconds in the x axis in figure \ref{fig:2-3_seconds}.
+
+\section{Task 3.2}
+
+I implemented the Peer Sampling Service in the gossip.lua file. I also wrote some unit tests for the array operations. To start gossip.lua in unit test mode, set the unit\textunderscore test\textunderscore mode constant to true. It will the run all the tests and end, and not actually start the simulation.
+
+To use the Peer Sampling Service without any dissemination, I can use the following configuration:
+
+\begin{lstlisting}
+---START CONFIG SECTION---
+do_peer_sampling = true
+peer_sampling_interval = 5
+peer_sampling_view_size = 8
+peer_sampling_exchange_rate = 4
+peer_sampling_healer_parameter = 1
+peer_sampling_shuffler_parameter = 1
+max_cycles = 10
+---END CONFIG SECTION---
+\end{lstlisting}
+
+According to the check partion script, the graph is connected:
+
+\lstinputlisting{logs/log_3-2_check_partition_output_h1s1.txt}
+
+\begin{figure}
+    \input{plots/plot_3-2_h1s1_clustering.tex}
+    \caption{Task 3.2: Clustering (50 Peers, H=1, S=1)}
+    \label{fig:3-2_h1s1_clustering}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_3-2_h1s1_indegrees.tex}
+    \caption{Task 3.2: In-degrees (50 Peers, H=1, S=1)}
+    \label{fig:3-2_h1s1_indegrees}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_3-2_h0s0_clustering.tex}
+    \caption{Task 3.2: Clustering (50 Peers, H=0, S=0)}
+    \label{fig:3-2_h0s0_clustering}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_3-2_h0s0_indegrees.tex}
+    \caption{Task 3.2: In-degrees (50 Peers, H=0, S=0)}
+    \label{fig:3-2_h0s0_indegrees}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_3-2_h4s0_clustering.tex}
+    \caption{Task 3.2: Clustering (50 Peers, H=4, S=0)}
+    \label{fig:3-2_h4s0_clustering}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_3-2_h4s0_indegrees.tex}
+    \caption{Task 3.2: In-degrees (50 Peers, H=4, S=0)}
+    \label{fig:3-2_h4s0_indegrees}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_3-2_h0s4_clustering.tex}
+    \caption{Task 3.2: Clustering (50 Peers, H=0, S=0)}
+    \label{fig:3-2_h0s4_clustering}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_3-2_h0s4_indegrees.tex}
+    \caption{Task 3.2: In-degrees (50 Peers, H=0, S=4)}
+    \label{fig:3-2_h0s4_indegrees}
+\end{figure}
+
+The In-degree and clustering graphs can be seen in figures \ref{fig:3-2_h1s1_indegrees} and \ref{fig:3-2_h1s1_clustering}, respectively.
+
+Varying the H and S parameters as recommended gives the results listed in graphs \ref{fig:3-2_h0s0_clustering} to \ref{fig:3-2_h0s4_indegrees}.
+
+\section{Task 4.1}
+
+This switch is implemented in gossip.lua. if the do\textunderscore peer \textunderscore sampling flag is set, the methods for returning peers for the dissemination protocols take their peers from the local view. Otherwise, they take them from the total list of available nodes.
+
+\section{Task 4.2}
+
+\begin{lstlisting}
+---START CONFIG SECTION---
+do_rumor_mongering = true
+do_anti_entropy = true
+do_peer_sampling = true
+gossip_interval = 2
+peer_sampling_interval = 5
+initial_hops_to_live = 4
+distribution_count = 3
+peer_sampling_view_size = 8
+peer_sampling_exchange_rate = 3
+peer_sampling_healer_parameter = 0
+peer_sampling_shuffler_parameter = 0
+peer_selection_policy = "rand"
+max_cycles = 10
+start_gossipping_after_cycles = 5
+---END CONFIG SECTION---
+
+\end{lstlisting}
+
+\begin{figure}
+    \input{plots/plot_4-2.tex}
+    \caption{Task 4.2: Dissemination Comparison with Peer Sampling}
+    \label{fig:4-2}
+\end{figure}
+
+\begin{figure}
+    \input{plots/plot_4-2_seconds.tex}
+    \caption{Task 4.2: Dissemination Comparison with Peer Sampling}
+    \label{fig:4-2_seconds}
+\end{figure}
+
+Finally, I compared various values of healer and shuffler parameters and plottet the results. I used the above configuration, with changed values in the peer\textunderscore sampling\textunderscore healer\textunderscore parameter and peer\textunderscore sampling\textunderscore shuffler\textunderscore parameter. The results can be found in figure \ref{fig:4-2}. In this figure you can also see the duplicate rates.
+For this particular graph, I wanted to see the results in seconds too, so I added an additional plot with seconds on the x axis in figure \ref{fig:4-2_seconds}.
 
 \end{document}
