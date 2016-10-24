@@ -12,8 +12,8 @@ function parse(lines)
   for i, line in ipairs(lines) do
     local tuple = {}
     local count = 1
+    if not string.starts(line, "VIEW_CONTENT") and not string.starts(line, "FINAL") then
       for element in string.gmatch(line, "%S+") do
-        
         -- for the Node field, we need to strip the parens
         if fields[count] == "Node" then
           element = tonumber(string.sub(element, 2, -2))
@@ -23,24 +23,38 @@ function parse(lines)
         count = count + 1
       end
 
-    -- to parse the datetime field, we need to combine the Date and Timestamp fields
-    tuple["ParsedTime"] = parse_timestamp(tuple["Date"] .. " " .. tuple["Timestamp"])
+      -- to parse the datetime field, we need to combine the Date and Timestamp fields
+      tuple["ParsedTime"] = parse_timestamp(tuple["Date"] .. " " .. tuple["Timestamp"])
 
-    tuples[i] = tuple
+      table.insert(tuples, tuple)
+    end
   end
   return tuples
 end
 
+function compare_by_cycle(t1, t2)
+  local t1_cycle = tonumber(t1["Cycle"])
+  local t2_cycle = tonumber(t2["Cycle"])
+  if t1_cycle == t2_cycle then
+    result = t1["ParsedTime"] < t2["ParsedTime"]
+    return result
+  else
+    local result = t1_cycle < t2_cycle
+    return result
+  end
+end
+
 -- aggregate the elements read from the log file
 function aggregate(tuples)
-  table.sort(tuples, function(tuple1, tuple2) return tuple1["Cycle"] < tuple2["Cycle"] end)
+  table.sort(tuples, compare_by_cycle)
+
   local elements = {}
   local starting_time = tuples[1]["ParsedTime"]
   local absolute_infected_nodes = 0
   local nodes_infected_by_anti_entropy = 0
   local nodes_infected_by_rumor_mongering = 0
   local duplicates = 0
-  for i, tuple in ipairs(tuples) do
+  for _, tuple in pairs(tuples) do
     relative_time = tuple["ParsedTime"] - starting_time
 
     cycles = tuple["Cycle"]

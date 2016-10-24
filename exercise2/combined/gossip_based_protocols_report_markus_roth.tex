@@ -1,0 +1,83 @@
+\documentclass[a4paper]{article}
+
+\usepackage{listings}
+\usepackage[T1]{fontenc}
+\usepackage{color}
+\usepackage{pxfonts}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+    aboveskip=3mm,
+    belowskip=3mm,
+    showstringspaces=false,
+    columns=flexible,
+    basicstyle={\small\ttfamily},
+    numbers=none,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{blue},
+    commentstyle=\color{dkgreen},
+    stringstyle=\color{mauve},
+    breaklines=true,
+    breakatwhitespace=true,
+    tabsize=3
+}
+
+\title{Gossip-based dissemination, Peer Sampling Service}
+
+\author{Markus Roth}
+
+\begin{document}
+\maketitle
+
+\section{Solution Overview}
+
+\subsection{Introduction}
+
+I created a single program that can be configured using constants at the top of the file. By changing these constants, it is possible to run all of the experiments in the assignment with the same piece of code. For each task, I have reproduced the configuration constants section of the program at the appropriate chapter in this document. To run the experiment, one needs to copy the configuration section into the correct section in gossip.lua and run it on the cluster. This section is marked with START CONFIG SECTION and END CONFIG SECTION.
+I chose this approach to reduce code duplication and guarantee a consistent reproducability of all results presented.
+
+\subsection{gossip.lua}
+
+This is the program that runs the experiements. If follows the provided skeleton. It contains the implementation of the peer samplingn service as well as the implementation of the rumor mongering and anti-entropy protocols.
+
+\subsection{parselog.lua}
+
+This LUA-script reads a log file created by running an experiment and aggragates the log entries to be able to parse them. It reads from log.txt and writes to aggregated\textunderscore log.txt. The aggregated log file contains the following columns:
+
+\begin{enumerate}
+\item relative\textunderscore time: The number of seconds passed from the start of the experiment
+\item cycles: The number of cycles passed frmo the start of the experiment
+\item absolute\textunderscore infected\textunderscore nodes: The absolute number of nodes that are infected
+\item relative\textunderscore infected\textunderscore nodes: The relative number of nodes that are infected
+\item nodes\textunderscore infected\textunderscore by\textunderscore anti\textunderscore entropy: The cumulative number of nodes infected by the anti-entropy prodocol.
+\item nodes\textunderscore infected\textunderscore by\textunderscore rumor\textunderscore mongering: The cumulative number of nodes infected by the rumor mongering prodocol.
+\end{enumerate}
+
+\subsection{plot.gp}
+
+This gnuplot script reads from aggregated\textunderscore log.txt and produces a PNG file of the graph. The resulting image is stored as plot.png
+
+\section{Task 2.1.1}
+\begin{lstlisting}
+---START CONFIG SECTION---
+do_anti_entropy = true
+do_rumor_mongering = false
+do_peer_sampling = false
+
+-- gossiping period should be 5 seconds
+gossip_interval = 5
+
+-- end the simulation after 20 cycles
+max_cycles = 20
+
+-- start anti-entropy immediately
+start_gossipping_after_cycles = 0
+--END CONFIG SECTION---
+\end{lstlisting}
+
+
+
+\end{document}

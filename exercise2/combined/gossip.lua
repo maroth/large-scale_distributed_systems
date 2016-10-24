@@ -10,8 +10,10 @@
 
 
 ------------------------------------
--- Constants
+-- Test Setup Constants
 ------------------------------------
+
+---START CONFIG SECTION---
 
 -- is rumor mongering enabled?
 do_rumor_mongering = true
@@ -23,49 +25,55 @@ do_anti_entropy = true
 do_peer_sampling = true
 
 -- gossip interval in seconds
-gossip_interval = 1
+gossip_interval = 5
 
 -- gossip interval in seconds
-peer_sampling_interval = 1
+peer_sampling_interval = 5
 
 -- when i get infected, send this number of infection messages to random peers
 -- only has effect when rumor mongering is active
-initial_hops_to_live = 5
+initial_hops_to_live = 10
 
 -- how many peers do I infect after being infected?
 -- only has effect when rumor mongering is active
-distribution_count = 1
+distribution_count = 10
 
 -- the size of the local view for the peer sampling algorithm (parameter c)
-peer_sampling_view_size = 4
+peer_sampling_view_size = 10
 
 -- how many peers are exchanged each round by peer sampling
-peer_sampling_exchange_rate = 2
+peer_sampling_exchange_rate = 3
 
 -- how many of the oldest peers should be skipped (parameter h)
-peer_sampling_healer_parameter = 2
+peer_sampling_healer_parameter = 3
 
 -- how many random items should be removed? (parameter s)
-peer_sampling_shuffler_parameter = 2
+peer_sampling_shuffler_parameter = 3
 
 -- peer selection policy for the peer sampling algorithm. Can be "rand" or "tail".
 peer_selection_policy = "rand"
 
 -- stop the simulation after this number of cycles
-max_cycles = 5
+max_cycles = 20
 
 -- start gossipping after this many cycles only, to give the peer sampling service time to work
 -- only makes sense if peer sampling is eanbles
-start_gossipping_after_cycles = 5
+start_gossipping_after_cycles = 10
+
+--END CONFIG SECTION---
+
+------------------------------------
+-- Debugging Constants
+------------------------------------
 
 -- print debug statements to std_out
-print_debug_messages = true
+print_debug_messages = false
 
 -- print debug statements for just one node (set to 0 for printing for all nodes)
-debug_for_node = 1
+debug_for_node = 0
 
 -- set this to true to not actually start the program, but run some tests 
-unit_test_mode = true
+unit_test_mode = false
 
 
 ------------------------------------
@@ -138,6 +146,11 @@ function peer_sampling_periodic()
     select_to_keep(received_peers)
     increase_local_view_age()
     -- local_view:unlock()
+    local view_content_message = ("VIEW_CONTENT " .. job.position)
+    for _, view_peer in pairs(local_view) do
+      view_content_message = view_content_message .. " " .. tostring(view_peer.id)
+    end
+    print(view_content_message)
   end
 end
 
@@ -218,7 +231,7 @@ function select_to_send()
   debug_table("to_send before self added", to_send)
 
   -- add self to to_send with age 0 at the beginning of the list (index 1)
-  table.insert(to_send, 1, {id = tostring(job.position), peer = job.me, age = tostring(0)})
+  table.insert(to_send, 1, {id = tostring(job.position), peer = job.me, age = 0})
   debug_table("to_send after self added", to_send)
 
   return to_send
@@ -243,6 +256,8 @@ function select_to_keep(received_peers)
       debug_table("inserting to local view", peer)
 
       -- if the new peer is not present, add the new item to the end of local_view
+      peer.id = tonumber(peer.id)
+      peer.age = tonumber(peer.age)
       table.insert(local_view, #local_view + 1, peer)
     end
   end
@@ -496,7 +511,7 @@ function cycle()
 
     -- end the program after the maximum number of cyles
     if cycles >= max_cycles then
-      debug("FINAL: node " .. job.position .. " " .. tostring(infected))
+      print("FINAL: node " .. job.position .. " " .. tostring(infected))
       os.exit()
     end
 
@@ -605,11 +620,11 @@ function run_tests()
 
   -- select_to_send
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "1", id = "1"}
-  local_view[#local_view + 1] = {peer = { ip = "2", port = "1"}, age = "2", id = "2"}
-  local_view[#local_view + 1] = {peer = { ip = "3", port = "1"}, age = "3", id = "3"}
-  local_view[#local_view + 1] = {peer = { ip = "4", port = "1"}, age = "4", id = "4"}
-  local_view[#local_view + 1] = {peer = { ip = "5", port = "1"}, age = "5", id = "5"}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 1, id = 1}
+  local_view[#local_view + 1] = {peer = { ip = "2", port = "1"}, age = 2, id = 2}
+  local_view[#local_view + 1] = {peer = { ip = "3", port = "1"}, age = 3, id = 3}
+  local_view[#local_view + 1] = {peer = { ip = "4", port = "1"}, age = 4, id = 4}
+  local_view[#local_view + 1] = {peer = { ip = "5", port = "1"}, age = 5, id = 5}
 
   local to_send = select_to_send()
   print("select_to_send results:")
@@ -620,13 +635,13 @@ function run_tests()
 
   -- select_to_keep
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "1", id = "1"}
-  local_view[#local_view + 1] = {peer = { ip = "2", port = "1"}, age = "2", id = "2"}
-  local_view[#local_view + 1] = {peer = { ip = "3", port = "1"}, age = "3", id = "3"}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 1, id = 1}
+  local_view[#local_view + 1] = {peer = { ip = "2", port = "1"}, age = 2, id = 2}
+  local_view[#local_view + 1] = {peer = { ip = "3", port = "1"}, age = 3, id = 3}
 
   local received = {}
-  received[#received + 1] = {peer = { ip = "4", port = "1"}, age = "4", id = "4"}
-  received[#received + 1] = {peer = { ip = "5", port = "1"}, age = "5", id = "5"}
+  received[#received + 1] = {peer = { ip = "4", port = "1"}, age = 4, id = 4}
+  received[#received + 1] = {peer = { ip = "5", port = "1"}, age = 5, id = 5}
 
   select_to_keep(received)
 
@@ -654,8 +669,8 @@ function test_select_to_send_oldest_removed()
   peer_sampling_shuffler_parameter = 0
 
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "2", port = "1"}, age = "2", id = "2"}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "1", id = "1"}
+  local_view[#local_view + 1] = {peer = { ip = "2", port = "1"}, age = 2, id = 2}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 1, id = 1}
   job.me = { ip = "3", port = "1"}
 
   local to_send = select_to_send()
@@ -674,11 +689,11 @@ function test_select_to_send_healer_parameter()
   peer_sampling_shuffler_parameter = 0
 
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "2", id = "2"}
-  local_view[#local_view + 1] = {peer = { ip = "2", port = "1"}, age = "9", id = "2"}
-  local_view[#local_view + 1] = {peer = { ip = "3", port = "1"}, age = "7", id = "2"}
-  local_view[#local_view + 1] = {peer = { ip = "4", port = "1"}, age = "1", id = "3"}
-  local_view[#local_view + 1] = {peer = { ip = "5", port = "1"}, age = "3", id = "1"}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 2, id = 2}
+  local_view[#local_view + 1] = {peer = { ip = "2", port = "1"}, age = 9, id = 2}
+  local_view[#local_view + 1] = {peer = { ip = "3", port = "1"}, age = 7, id = 2}
+  local_view[#local_view + 1] = {peer = { ip = "4", port = "1"}, age = 1, id = 3}
+  local_view[#local_view + 1] = {peer = { ip = "5", port = "1"}, age = 3, id = 1}
   job.me = { ip = "0", port = "1"}
 
   local to_send = select_to_send()
@@ -686,7 +701,7 @@ function test_select_to_send_healer_parameter()
   debug_table("local view", local_view)
   for _, ts in pairs(to_send) do
     print(ts.age)
-    assert(ts.age < "7", "one of the oldest two items was to be sent")
+    assert(ts.age < 7, "one of the oldest two items was to be sent")
   end
 end
 
@@ -699,7 +714,7 @@ function test_select_to_send_exchange_rate()
   peer_sampling_shuffler_parameter = 0
 
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "2", id = "2"}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 2, id = 2}
   job.me = { ip = "0", port = "1"}
 
   local to_send = select_to_send()
@@ -711,9 +726,9 @@ end
 
 function test_select_to_keep_removed_duplicates()
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "1", id = "1"}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 1, id = 1}
   local received = {}
-  received[#received + 1] = {peer = { ip = "1", port = "1"}, age = "4", id = "1"}
+  received[#received + 1] = {peer = { ip = "1", port = "1"}, age = 4, id = 1}
 
   select_to_keep(received)
 
@@ -724,9 +739,9 @@ end
 
 function test_select_to_keep_append_received()
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "1", id = "1"}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 1, id = 1}
   local received = {}
-  received[#received + 1] = {peer = { ip = "2", port = "1"}, age = "4", id = "2"}
+  received[#received + 1] = {peer = { ip = "2", port = "1"}, age = 4, id = 2}
 
   select_to_keep(received)
 
@@ -737,13 +752,13 @@ end
 function test_select_to_keep_oldest_removed()
   peer_sampling_view_size = 1
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "6", id = "1"}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 6, id = 1}
   local received = {}
-  received[#received + 1] = {peer = { ip = "2", port = "1"}, age = "1", id = "2"}
+  received[#received + 1] = {peer = { ip = "2", port = "1"}, age = 1, id = 2}
 
   select_to_keep(received)
 
-  assert(local_view[1].age == "1", "older peer was not replaced by received newer peer")
+  assert(local_view[1].age == 1, "older peer was not replaced by received newer peer")
 end
 
 
@@ -752,12 +767,12 @@ function test_select_to_keep_shuffle_parameter_respeced()
   peer_sampling_shuffler_parameter = 2
   peer_sampling_healer_parameter = 0
   local_view = {}
-  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = "6", id = "1"}
-  local_view[#local_view + 1] = {peer = { ip = "3", port = "1"}, age = "6", id = "3"}
-  local_view[#local_view + 1] = {peer = { ip = "4", port = "1"}, age = "6", id = "4"}
-  local_view[#local_view + 1] = {peer = { ip = "5", port = "1"}, age = "6", id = "5"}
+  local_view[#local_view + 1] = {peer = { ip = "1", port = "1"}, age = 6, id = 1}
+  local_view[#local_view + 1] = {peer = { ip = "3", port = "1"}, age = 6, id = 3}
+  local_view[#local_view + 1] = {peer = { ip = "4", port = "1"}, age = 6, id = 4}
+  local_view[#local_view + 1] = {peer = { ip = "5", port = "1"}, age = 6, id = 5}
   local received = {}
-  received[#received + 1] = {peer = { ip = "2", port = "1"}, age = "1", id = "2"}
+  received[#received + 1] = {peer = { ip = "2", port = "1"}, age = 1, id = 2}
 
   select_to_keep(received)
 
