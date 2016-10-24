@@ -66,10 +66,11 @@ start_gossipping_after_cycles = 0
 
 ---START CONFIG SECTION---
 
-do_anti_entropy = true
+do_rumor_mongering = true
 gossip_interval = 5
 max_cycles = 20
-
+initial_hops_to_live = 3
+distribution_count = 2
 --END CONFIG SECTION---
 
 ------------------------------------
@@ -442,8 +443,8 @@ function rumor_mongering_periodic()
     local exchange_peer_positions = find_random_peers()
     for exchange_peer_position, _ in pairs(exchange_peer_positions) do
       local exchange_peer = job.nodes[exchange_peer_position]
-      rpc.call(exchange_peer, {'rumor_mongering_infect', buffered_hops_to_live, job.position})
       debug(job.position .. " <--rumor-mongering--> " .. exchange_peer_position)
+      rpc.call(exchange_peer, {'rumor_mongering_infect', buffered_hops_to_live, job.position})
     end
     buffered = false
   end
@@ -493,13 +494,14 @@ function find_random_peers()
   -- otherwise, we take a random number of peers from job.nodes, requiring that we have no doubple items and don't shoose ourself
   else
     local exchange_peer_positions = {}
+    local exchange_peer_position = -1
     local found_peers = 0
     repeat
       repeat
-        local exchange_peer_position = math.random(#job.nodes)
+        exchange_peer_position = math.random(#job.nodes)
       until (exchange_peer_position ~= job.position and (not exchange_peer_positions[exchange_peer_position]))
       exchange_peer_positions[exchange_peer_position] = true
-      local found_peers = found_peers + 1
+      found_peers = found_peers + 1
     until found_peers == distribution_count
     return exchange_peer_positions
   end
