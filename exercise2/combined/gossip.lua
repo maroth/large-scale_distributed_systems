@@ -10,19 +10,17 @@
 
 
 ------------------------------------
--- Test Setup Constants
+-- Default values for Test Setup
 ------------------------------------
 
----START CONFIG SECTION---
-
 -- is rumor mongering enabled?
-do_rumor_mongering = true
+do_rumor_mongering = false
 
 -- is anti-entropy gossipping enabled?
-do_anti_entropy = true
+do_anti_entropy = false
 
 -- use the peer sampling service?
-do_peer_sampling = true
+do_peer_sampling = false
 
 -- gossip interval in seconds
 gossip_interval = 5
@@ -58,7 +56,19 @@ max_cycles = 20
 
 -- start gossipping after this many cycles only, to give the peer sampling service time to work
 -- only makes sense if peer sampling is eanbles
-start_gossipping_after_cycles = 10
+start_gossipping_after_cycles = 0
+
+
+------------------------------------
+-- Experiment Setup
+------------------------------------
+-- PASTE EXPERIMENT CONFIGURATION FROM REPORT HERE
+
+---START CONFIG SECTION---
+
+do_anti_entropy = true
+gossip_interval = 5
+max_cycles = 20
 
 --END CONFIG SECTION---
 
