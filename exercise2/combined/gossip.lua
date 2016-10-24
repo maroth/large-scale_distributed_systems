@@ -52,7 +52,7 @@ peer_sampling_shuffler_parameter = 3
 peer_selection_policy = "rand"
 
 -- stop the simulation after this number of cycles
-max_cycles = 20
+max_cycles = 10
 
 -- start gossipping after this many cycles only, to give the peer sampling service time to work
 -- only makes sense if peer sampling is eanbles
@@ -88,7 +88,7 @@ debug_for_node = 0
 unit_test_mode = false
 
 -- how often should the peer sampling service print its views? (seconds)
-peer_sampling_print_view_interval = 10
+peer_sampling_print_view_interval = 40
 
 ------------------------------------
 -- Initialization
@@ -173,6 +173,7 @@ function peer_sampling_print_view_periodic()
     for _, view_peer in pairs(local_view) do
       view_content_message = view_content_message .. " " .. tostring(view_peer.id)
     end
+    print(view_content_message)
   end
 end
 
@@ -182,7 +183,6 @@ function increase_local_view_age()
   for _, peer in pairs(local_view) do
     peer.age = peer.age + 1
   end
-  print(view_content_message)
 end
 
 
@@ -265,6 +265,9 @@ function select_to_keep(received_peers)
   -----------
   -- MERGE --
   -----------
+
+  -- if we did not receive any peers, we need to do nothing
+  if not received_peers then return nil end
 
   -- merge the received peers with the local view
   -- but if the item is already present, don't add it again
@@ -823,14 +826,35 @@ end
 
 
 function main()
+  -- if we use peer sampling, start the thread that prints the local views of the nodes (for evaluation by the ruby scripts)
+  -- this needs to happen at the very start so we get consistent snapshots
+  if do_peer_sampling then
+    events.thread(peer_sampling_print_view_periodic)
+  end
+
   -- init random number generator
   math.randomseed(job.position*os.time())
-
-  -- initialize table printinf for debugging
 
   -- wait for all nodes to start up (conservative)
   events.sleep(2)
 
+  -- desynchronize the nodes
+  local desync_wait = (gossip_interval * math.random())
+
+  -- the first node is the source and is infected since the beginning
+  if job.position == 1 then
+    infected = true
+    debug(job.position .. ' got infected as patient zero')
+    logS("i_am_infected_as_patient_zero")
+    desync_wait = 0
+    buffered = true
+    buffered_hops_to_live = initial_hops_to_live
+  end
+
+  debug("waiting for ".. desync_wait.. " to desynchronize")
+  events.sleep(desync_wait)  
+
+  -- peer sampling initialization
   if do_peer_sampling then
     -- create the local_view by:
     -- packing all peers into a list all_peers with additional metadata
@@ -858,22 +882,7 @@ function main()
     events.thread(peer_sampling_periodic)
   end
 
-  -- desynchronize the nodes
-  local desync_wait = (gossip_interval * math.random())
-
-  -- the first node is the source and is infected since the beginning
-  if job.position == 1 then
-    infected = true
-    debug(job.position .. ' got infected as patient zero')
-    logS("i_am_infected_as_patient_zero")
-    desync_wait = 0
-    buffered = true
-    buffered_hops_to_live = initial_hops_to_live
-  end
-
-  debug("waiting for ".. desync_wait.. " to desynchronize")
-  events.sleep(desync_wait)  
-
+  -- start the main dissemination loop
   events.thread(cycle)
 end  
 
