@@ -65,12 +65,13 @@ start_gossipping_after_cycles = 0
 -- PASTE EXPERIMENT CONFIGURATION FROM REPORT HERE
 
 ---START CONFIG SECTION---
-
-do_rumor_mongering = true
-gossip_interval = 5
+do_peer_sampling = true
+peer_sampling_interval = 5
+peer_sampling_view_size = 8
+peer_sampling_exchange_rate = 4
+peer_sampling_healer_parameter = 1
+peer_sampling_shuffler_parameter = 1
 max_cycles = 20
-initial_hops_to_live = 3
-distribution_count = 2
 --END CONFIG SECTION---
 
 ------------------------------------
@@ -86,6 +87,8 @@ debug_for_node = 0
 -- set this to true to not actually start the program, but run some tests 
 unit_test_mode = false
 
+-- how often should the peer sampling service print its views? (seconds)
+peer_sampling_print_view_interval = 10
 
 ------------------------------------
 -- Initialization
@@ -141,6 +144,9 @@ buffered_hops_to_live = 0
 -- items in it have the attributes "Age", "Peer", and "Id"
 local_view = {}
 
+-- a lock to prevent multiple threads editing local_view at the same time
+local_view_lock = events.lock()
+
 
 ------------------------------------
 -- Peer Sampling Service
@@ -150,18 +156,23 @@ local_view = {}
 function peer_sampling_periodic()
   while true do
     events.sleep(peer_sampling_interval)
-    -- local_view:lock()
+    local_view_lock:lock()
     local peer = select_peer()
     local to_send = select_to_send()
     local received_peers = rpc.call(peer.peer, {'peer_sampling_receive', to_send, job.position})
     select_to_keep(received_peers)
     increase_local_view_age()
-    -- local_view:unlock()
+    local_view_lock:unlock()
+  end
+end
+
+function peer_sampling_print_view_periodic()
+  while true do
+    events.sleep(peer_sampling_print_view_interval)
     local view_content_message = ("VIEW_CONTENT " .. job.position)
     for _, view_peer in pairs(local_view) do
       view_content_message = view_content_message .. " " .. tostring(view_peer.id)
     end
-    print(view_content_message)
   end
 end
 
@@ -171,14 +182,15 @@ function increase_local_view_age()
   for _, peer in pairs(local_view) do
     peer.age = peer.age + 1
   end
+  print(view_content_message)
 end
 
 
 function peer_sampling_receive(received_peers, sender_position)
-  -- local_view:lock()
+  local_view_lock:lock()
   local result = select_to_send()
   select_to_keep(received_peers)
-  -- local_view:unlock()
+  local_view_lock:unlock()
   return result
 end
 
@@ -391,7 +403,6 @@ function anti_entropy_periodic()
   local exchange_peer_position = find_random_peer()
   debug(job.position .. " <--anti-entropy--> " .. exchange_peer_position)
   local exchange_peer = job.nodes[exchange_peer_position]
-  table.print(exchange_peer)
   local peer_is_infected = rpc.call(exchange_peer, {'anti_entropy_infect', infected, job.position})
 
   -- if the peer is infected, but I am not yet infected, then I have now become infected
@@ -465,8 +476,10 @@ function rumor_mongering_infect(hops_to_live, sender_position)
     debug('Position ' .. job.position .. ' received duplicate from ' .. sender_position)
     logS("duplicate_received")
   end
-  if not buffered or buffered and hops_to_live - 1 > buffered_hops_to_live then
-    local buffered_hops_to_live = hops_to_live - 1
+  -- if not already buffered, buffer
+  -- if already buffered, but new buffer HTL is higher, buffer new HTL
+  if (not buffered) or (buffered and hops_to_live - 1 > buffered_hops_to_live) then
+    buffered_hops_to_live = hops_to_live - 1
     if buffered_hops_to_live > 0 then
       buffered = true
     end
@@ -522,12 +535,6 @@ function cycle()
     -- increase cycle count 
     cycles = cycles + 1
 
-    -- end the program after the maximum number of cyles
-    if cycles >= max_cycles then
-      print("FINAL: node " .. job.position .. " " .. tostring(infected))
-      os.exit()
-    end
-
     -- only start the dissemination exchanges after a certain amount of cyles
     -- so the peer sampling service has some time to work
     if cycles >= start_gossipping_after_cycles then
@@ -542,6 +549,12 @@ function cycle()
         events.thread(anti_entropy_periodic)
       end
 
+    end
+
+    -- end the program after the maximum number of cyles
+    if cycles >= max_cycles then
+      print("FINAL: node " .. job.position .. " " .. tostring(infected))
+      os.exit()
     end
 
   end 
