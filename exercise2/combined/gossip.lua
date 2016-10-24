@@ -390,6 +390,7 @@ function anti_entropy_periodic()
   local exchange_peer_position = find_random_peer()
   debug(job.position .. " <--anti-entropy--> " .. exchange_peer_position)
   local exchange_peer = job.nodes[exchange_peer_position]
+  table.print(exchange_peer)
   local peer_is_infected = rpc.call(exchange_peer, {'anti_entropy_infect', infected, job.position})
 
   -- if the peer is infected, but I am not yet infected, then I have now become infected
@@ -422,7 +423,7 @@ function find_random_peer()
   else 
     local exchange_peer_position = 0
     repeat
-      local exchange_peer_position = math.random(#job.nodes)
+      exchange_peer_position = math.random(#job.nodes)
     until exchange_peer_position ~= job.position
     return exchange_peer_position
   end
