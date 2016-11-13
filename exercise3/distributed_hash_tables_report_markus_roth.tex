@@ -1,0 +1,52 @@
+\documentclass[a4paper]{article}
+\nonstopmode
+
+\usepackage{listings}
+\usepackage[T1]{fontenc}
+\usepackage{color}
+\usepackage{pxfonts}
+\usepackage{pdfpages}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+
+\lstset{frame=tb,
+    aboveskip=3mm,
+    belowskip=3mm,
+    showstringspaces=false,
+    columns=flexible,
+    basicstyle={\small\ttfamily},
+    numbers=none,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{blue},
+    commentstyle=\color{dkgreen},
+    stringstyle=\color{mauve},
+    breaklines=true,
+    breakatwhitespace=true,
+    tabsize=3
+}
+
+\title{Distributed Hash Tables}
+
+\author{Markus Roth}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Solution Overview}
+
+\subsection{Constructing a Ring}
+
+\begin{figure}
+    \input{task_2_1/search_performance}
+    \label{fig:2-1}
+\end{figure}
+
+Every node of the ring sends 500 queries for random keys. As we can see the figure \ref{fig:2-1}, the number of hops is evenly distributed between 0 and 63 in a ring of size 64. This is as expected: Since the nodes are randomly distributed around the ring, and the search only takes place in a linear fashion, the search will have on average n/2 hops, and every possible number of hops from the minimum to the maximum will have the same chance of occuring.
+
+\end{document}

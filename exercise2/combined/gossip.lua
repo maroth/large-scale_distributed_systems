@@ -79,7 +79,7 @@ max_cycles = 20
 ------------------------------------
 
 -- print debug statements to std_out
-print_debug_messages = false
+print_debug_messages = true
 
 -- print debug statements for just one node (set to 0 for printing for all nodes)
 debug_for_node = 0
@@ -897,4 +897,4 @@ else
   events.thread(main)  
 end
 
-events.loop()
+events.run()
