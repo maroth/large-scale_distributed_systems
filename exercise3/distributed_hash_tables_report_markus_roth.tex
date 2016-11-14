@@ -47,6 +47,6 @@
     \label{fig:2-1}
 \end{figure}
 
-Every node of the ring sends 500 queries for random keys. As we can see the figure \ref{fig:2-1}, the number of hops is evenly distributed between 0 and 63 in a ring of size 64. This is as expected: Since the nodes are randomly distributed around the ring, and the search only takes place in a linear fashion, the search will have on average n/2 hops, and every possible number of hops from the minimum to the maximum will have the same chance of occuring.
+Every node of the ring sends 500 queries for random keys. As we can see the figure \ref{fig:2-1}, the number of hops is evenly distributed between 0 and 63 in a ring of size 64. This is as expected: Since the nodes are randomly distributed around the ring, and the search only takes place in a linear fashion, the search will have on average n/2 hops, and every possible number of hops from the minimum to the maximum will have the same chance of occuring. The performance of search without fingers is thus O(n).
 
 \end{document}
