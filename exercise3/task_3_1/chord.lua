@@ -22,7 +22,7 @@ misc = require("splay.misc")
 join_desync_max_interval = 10
 
 -- issue search queries after waiting for all nodes to be in the ring
-number_of_queries = 500
+number_of_queries = 0
 
 -- the size of node IDs, in bits
 -- needs to be a multiple of 4 so the hashing function works as it does
@@ -34,16 +34,30 @@ node_id_size = 32
 -- if false, nodes only are aware of their successor and predecessor
 use_fingers = true
 
+-- if we use stabilization, the process of finding fingers and successors is vastly different than before
+-- this requires use_fingers to be true
+use_stabilization = true
+
 ------------------------------------
 -- Debugging Constants
 ------------------------------------
 
 
 -- print debug statements to std_out
-print_debug_messages = false
+print_debug_messages = true
 
--- interval in seconds to show the ring string
+-- how often to stabilize the successor of each node (in seconds)
+stabilize_interval = 100
+
+-- hof often for each node to fix its fingers (in seconds)
+fix_fingers_interval = 5
+
+-- interval in seconds to show the ring string (in seconds)
 ring_string_interval = 60
+
+-- the ring string can show all fingers for each node
+-- but this crashes due to overflow for large values of m and large numbers of nodes
+show_fingers_in_ring_string = false
 
 -- print debug statements for just one node (set to 0 for printing for all nodes)
 debug_for_node = 0
@@ -52,15 +66,17 @@ debug_for_node = 0
 unit_test_mode = false
 
 
+
+
 ------------------------------------
 -- Global Variables
 ------------------------------------
 
 -- reference to own node
-self_node = {}
+self_node = nil
 
 -- the closest node with a smaller ID
-predecessor = {}
+predecessor = nil
 
 -- the table of fingers for the local node
 fingers = {}
@@ -74,7 +90,7 @@ neighbor_lock = events.lock()
 
 -- gets the node info of the predecessor to this node
 function get_predecessor()
-    debug_print("get_redecessor returning with id " .. normalize_id(get_id(predecessor)))
+    debug_print("get_predecessor returning with id " .. normalize_id(get_id(predecessor)))
     return predecessor
 end
 
@@ -141,8 +157,66 @@ function my_ring_string_entry()
     for i = 1, node_id_size do
         finger_string = finger_string .. normalize_id(get_id(fingers[i])) .. " "
     end
-    --return "ID " .. job.position .. " key: " .. get_own_key() .. " range: " .. my_range() .. " fingers: [" .. finger_string .. "]\n"
-    return "ID " .. job.position .. " key: " .. get_own_key() .. " range: " .. my_range() .. "\n"
+    if show_fingers_in_ring_string then
+        return "ID " .. job.position .. " key: " .. get_own_key() .. " range: " .. my_range() .. " fingers: [" .. finger_string .. "]\n"
+    else
+        return "ID " .. job.position .. " key: " .. get_own_key() .. " range: " .. my_range() .. "\n"
+    end
+end
+
+------------------------------------
+-- Stabilization
+------------------------------------
+
+-- check if the predecessor of my successor is ahead of me
+-- if this is the case, set me successor to the predecessor of my old successor
+function stabilize()
+    while true do
+        events.sleep(stabilize_interval)
+        debug_print("stabilize: finding predecessor of my successor " .. normalize_id(get_id(fingers[1])))
+        local pred_of_succ = rpc.call(fingers[1], {"get_predecessor"})
+        debug_print("got predecessor of successor: " .. normalize_id(get_id(pred_of_succ)))
+
+        local ps = normalize_id(get_id(pred_of_succ))
+        local sn = normalize_id(get_id(self_node))
+        local f1 = normalize_id(get_id(fingers[1]))
+        local condition = ps > sn and ps < f1
+        if condition then
+            debug_print("new successor is better than old successor, setting successor to " .. normalize_id(get_id(pred_of_succ)))
+            fingers[1] = pred_of_succ
+            local a = 2
+        end
+
+        debug_print("notifying succ: " .. normalize_id(get_id(fingers[1])))
+        rpc.call(fingers[1], {"notify", self_node})
+    end
+end
+
+function notify(source_node)
+    debug_print("notified by " .. normalize_id(get_id(source_node)))
+    local source_node_id = normalize_id(get_id(source_node))
+    local predecessor_id = normalize_id(get_id(predecessor))
+    local condition = source_node_id > predecessor_id  and source_node_id < get_own_key()
+    if predecessor == nil or condition then
+        debug_print("new predecessor is better " .. normalize_id(get_id(source_node)))
+        predecessor = source_node
+    end
+end
+
+function fix_fingers()
+    local counter = 0
+    while true do
+        events.sleep(fix_fingers_interval)
+        counter = counter + 1
+        if counter > node_id_size then
+            counter = 1
+        end
+        local key_to_find = get_own_key() + (2 ^ (counter - 1)) % (2 ^ node_id_size)
+        debug_print("fix finger " .. counter .. " with key " .. key_to_find)
+        local succ = find_successor(key_to_find)
+        debug_print("new finger " .. counter .. " is " .. normalize_id(get_id(succ)))
+        fingers[counter] = succ
+    end
 end
 
 
@@ -589,6 +663,11 @@ function main()
     end
     
     setup_links()
+
+    if use_fingers and use_stabilization then
+        events.thread(stabilize)
+        events.thread(fix_fingers)
+    end
 
     -- the first nodes needs to start the string ring thread that regularly prints the ring status for debugging
     if job.position == 1 then
