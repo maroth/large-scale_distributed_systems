@@ -1,0 +1,23 @@
+2016-11-15 23:18:35.225392 (196)  START_LOG
+2016-11-15 23:18:35.230967 (196)   SPLAYD LUA EXEC
+2016-11-15 23:18:35.245484 (196)  	>> Job settings:
+2016-11-15 23:18:35.245550 (196)  	Ref: 724b2182b37426500382c9dedc6ca854
+2016-11-15 23:18:35.245567 (196)  	Name: 
+2016-11-15 23:18:35.245578 (196)  	Description: 
+2016-11-15 23:18:35.245587 (196)  	Disk:
+2016-11-15 23:18:35.245598 (196)  		max 1024 files
+2016-11-15 23:18:35.245608 (196)  		max 1024 file descriptors
+2016-11-15 23:18:35.245619 (196)  		max 67108864 size in bytes
+2016-11-15 23:18:35.245628 (196)  		lib directoy /home/splayd/workspace/local_splay_cluster/hosts/splayd_172_17_0_3_47/jobs_fs/724b2182b37426500382c9dedc6ca854/lib
+2016-11-15 23:18:35.245638 (196)  		cpath : /home/splayd/local/lualibs/clib/?.so;/home/splayd/local/lualibs/clib/?.so;./?.so;/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;/usr/lib/lua/5.1/?.so;/usr/local/lib/lua/5.1/loadall.so;/home/splayd/workspace/local_splay_cluster/hosts/splayd_172_17_0_3_47/jobs_fs/724b2182b37426500382c9dedc6ca854/lib/?.so
+2016-11-15 23:18:35.245649 (196)  	Mem 20971520 bytes of memory
+2016-11-15 23:18:35.245657 (196)  	Network:
+2016-11-15 23:18:35.245669 (196)  		max 134217728/134217728 send/receive bytes
+2016-11-15 23:18:35.245679 (196)  		max 1024 tcp sockets
+2016-11-15 23:18:35.245688 (196)  		ip 172.17.0.3
+2016-11-15 23:18:35.245701 (196)  		ports 60177-60186
+2016-11-15 23:18:35.245710 (196)  
+2016-11-15 23:18:35.253404 (196)  	Job code loaded
+2016-11-15 23:18:35.279230 (196)  	[splay.events] E: thread: 0xa6d8b0 DIE (error: [string "job code"]:675: attempt to call global 'logS' (a nil value))
+2016-11-15 23:18:35.279270 (196)  	[splay.events] E: stack traceback:
+1970-01-01 01:00:00.0 (196)  b code"]:675: in function <[string "job code"]:649>

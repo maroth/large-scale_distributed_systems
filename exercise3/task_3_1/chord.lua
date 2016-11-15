@@ -22,7 +22,7 @@ misc = require("splay.misc")
 join_desync_max_interval = 10
 
 -- issue search queries after waiting for all nodes to be in the ring
-number_of_queries = 0
+number_of_queries = 500
 
 -- the size of node IDs, in bits
 -- needs to be a multiple of 4 so the hashing function works as it does
@@ -44,13 +44,13 @@ use_stabilization = true
 
 
 -- print debug statements to std_out
-print_debug_messages = true
+print_debug_messages = false
 
 -- how often to stabilize the successor of each node (in seconds)
-stabilize_interval = 100
+stabilize_interval = 5
 
 -- hof often for each node to fix its fingers (in seconds)
-fix_fingers_interval = 5
+fix_fingers_interval = 10
 
 -- interval in seconds to show the ring string (in seconds)
 ring_string_interval = 60

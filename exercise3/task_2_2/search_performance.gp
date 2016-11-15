@@ -8,7 +8,7 @@ set style line 5 lt 1 lc rgb "#CD00CD" lw 7 # purple
 set style line 7 lt 3 lc rgb "#000000" lw 7 # black, dashed line
 
 set output "search_performance.png"
-set title "Search Performance without Fingers"
+set title "Search Performance with Fingers"
 
 # indicates the labels
 set xlabel "Hops"
@@ -23,7 +23,7 @@ set key top left
 # indicates the ranges
 set boxwidth 0.6
 set style fill solid 1.0
-set yrange [0:] # example of a closed range (points outside will not be displayed)
-set xrange [-1:64] # example of a range closed on one side only, the max will determined automatically
+set yrange [0:] 
+set xrange [-1:7] 
 
 plot "search_performance.log" u ($1):($2) with boxes title ""
