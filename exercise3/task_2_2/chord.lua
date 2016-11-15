@@ -1,4 +1,3 @@
------------------------------------
 -- DISTRIBUTED HASH TABLE
 ------------------------------------
 -- Key-based routing layer 
@@ -12,7 +11,7 @@ require("splay.base")
 crypto = require("crypto")
 rpc = require("splay.urpc")
 misc = require("splay.misc")
-require("debugger")
+-- require("debugger")
 
 ------------------------------------
 -- Default values for Test Setup
@@ -20,7 +19,7 @@ require("debugger")
 
 -- maximum seconds seconds to wait until joining the ring
 -- a random value between 0 and this value is used
-join_desync_max_interval = 10
+join_desync_max_interval = 1
 
 -- issue search queries after waiting for all nodes to be in the ring
 number_of_queries = 0
@@ -75,21 +74,25 @@ neighbor_lock = events.lock()
 
 -- gets the node info of the predecessor to this node
 function get_predecessor()
+    debug_print("get_redecessor returning with id " .. normalize_id(get_id(predecessor)))
     return predecessor
 end
 
 -- sets the predecessor node for this node
 function set_predecessor(new_value)
+    debug_print("set_predecessor to " .. normalize_id(get_id(predecessor)))
     predecessor = new_value
 end
 
 -- gets the successor node to this node
 function get_successor()
+    debug_print("get_successor returning with id " .. normalize_id(get_id(fingers[1])))
     return fingers[1]
 end
 
 -- sets the predecessor node for this node
 function set_successor(new_value)
+    debug_print("set_successor to " .. normalize_id(get_id(fingers[1])))
     fingers[1] = new_value
 end
 
@@ -182,12 +185,21 @@ end
 -- Finding Neighbors
 ------------------------------------
 
--- find and return the node that is the fingers[1] of the passed key in the DHT ring
+-- find and return the node that is the successor of the passed key in the DHT ring
 function find_successor(id)
-    local pred = find_predecessor(id)
-    local succ = rpc.call(pred, {'get_successor'})
-    debug_print("ID " .. get_own_key() .. " says predecessor of " .. id .. " is " .. normalize_id(get_id(succ)))
-    return succ
+    debug_print("find_successor for id " .. id)
+    --I copied this part from the splay reference implentation of chord. It's not in the algorithm provided.
+    if is_in_range_numeric(id, get_own_key(), normalize_id(get_id(fingers[1]) + 1), true, false) then
+        debug_print("ID " .. get_own_key() .. " says predecessor of " .. id .. " is itself")
+        debug_print("find_successor done")
+        return fingers[1]
+    else
+        local pred = find_predecessor(id)
+        local succ = rpc.call(pred, {'get_successor'})
+        debug_print("ID " .. get_own_key() .. " says predecessor of " .. id .. " is " .. normalize_id(get_id(succ)))
+        debug_print("find_successor done")
+        return succ
+    end
 end
 
 -- find the predecessor of the passed id
@@ -195,35 +207,61 @@ end
 -- where the passed id is between the the predecessor that is the response of this functino
 -- and its fingers[1]
 function find_predecessor(id)
+    debug_print("find_predecessor for id " .. id)
     debug_print("ID " .. get_own_key() .. " finding closest predecessor of " .. id .. "...")
+
     local cursor = self_node
     local cursor_successor = fingers[1]
-    while not (id > normalize_id(get_id(cursor)) and id <= normalize_id(get_id(cursor_successor))) do
+
+
+    -- if the node is its own successor, there is only one node, and we can return ourself
+    if get_id(cursor) == get_id(cursor_successor) then 
+        debug_print("i am my own successor. returning self in find_predecessor, as I have nothing else to offer.")
+        return cursor 
+    end
+
+    debug_print("is ID " .. id .. " between cursor " .. normalize_id(get_id(cursor)) .. " and cursor_successor " .. normalize_id(get_id(cursor_successor)) .. "?")
+    while not is_in_range_numeric(tonumber(id), normalize_id(get_id(cursor)), normalize_id(get_id(cursor_successor)), false, true) do
         if use_fingers then
             -- if we use fingers, we can find our predecessor using the finger tables
+            debug_print("the id is not yet between cursor and cursor_successor. we need the closest preceeding finger to " .. id .. " on " .. normalize_id(get_id(cursor)))
             cursor = rpc.call(cursor, {"closest_preceeding_finger", id})
         else
             -- if not, we iterate around the ring step by step
             cursor = cursor_successor
         end
-        cursor_predecessor = rpc.call(cursor, {"get_successor"})
+        cursor_successor = rpc.call(cursor, {"get_successor"})
+        
+        if get_id(cursor_successor) == get_id(cursor) then 
+            debug_print("the successor of the cursor is itself, this will end in an infinite loop. just take the cursor")
+            return cursor
+        end
     end
+    debug_print("we found the predecessor to " .. id .. ", it is " .. normalize_id(get_id(cursor)))
+    debug_print("FIND PREDECESSOR DONE")
     return cursor
 end
 
 -- of all the local fingers, return the one that points the closest without going over to the passed id
 function closest_preceeding_finger(id)
+    debug_print("closest_preceeding_finger for " .. id)
+    events.sleep(2)
     for finger_number = node_id_size, 1, -1 do
+        debug_print("iterating over all fingeres, currently at " .. finger_number .. " pointing to " .. normalize_id(get_id(fingers[finger_number])))
         local finger_id = normalize_id(get_id(fingers[finger_number]))
-        local condition = finger_id > get_own_key() and finger_id < tonumber(id) 
-        if condition then 
+        debug_print("is finger number " .. finger_number .. " (ID " .. finger_id .. ") between my id of " .. get_own_key() .. " and the search id of " .. id .. "?")
+        if is_in_range_numeric(tonumber(id), finger_id, get_own_key(), false, true) then
+            debug_print("the finger id is between my key of " .. get_own_key() .. " and the search id of " .. id)
             debug_print("ID " .. get_own_key() .. " says closest preceeding finger of " .. id .. " is " .. normalize_id(get_id(fingers[finger_number])))
+            debug_print("closest_preceeding_finger done, returning " .. normalize_id(get_id(fingers[finger_number])))
             return fingers[finger_number]
         end
     end
-    debug_print("ERROR: NO RETURN FROM PRECEEDING FINGER QUERY")
-    print_finger_table()
-    os.exit(1)
+
+    -- if none of the fingers seems to be best, just send the first one
+    -- not sure if this is correct
+    debug_print("closest_preceeding_finger done, found nothing that fit the range, returning self")
+    return self_node
 end
 
 
@@ -256,30 +294,38 @@ end
 
 -- returns the starting key of the finger with the passed number
 function get_finger_start(finger_number)
-    return (get_own_key() + 2 ^ (finger_number - 1)) % (2 ^ node_id_size)
+    return (get_own_key() + (2 ^ (finger_number - 1))) % (2 ^ node_id_size)
 end
 
 -- returns the key of the finger_number finger pointing at this node
 function get_finger_source(finger_number)
-    return (get_own_key() + 1 - 2 ^ (finger_number - 1)) % (2 ^ node_id_size)
+    local exp = 2 ^ (finger_number - 1)
+    local sum = get_own_key() + 1
+    return (sum - exp) % (2 ^ node_id_size)
 end
 
 -- initialize the own finger table when joining the ring
 function init_finger_table(anchor_node)
+    debug_print("init_finger_table with anchor node " .. normalize_id(get_id(anchor_node)))
+
     -- create the first finger entry in the finger table 
     -- the first finger is also the fingers[1] node
+    debug_print("calling find_successor on the anchor node for parameter " .. get_finger_start(1))
     fingers[1] = rpc.call(anchor_node, {"find_successor", get_finger_start(1)})
+    debug_print("find_successor returned, finger 1 is now " .. normalize_id(get_id(fingers[1])))
     predecessor = rpc.call(fingers[1], {"get_predecessor"})
-    debug_print("ID " .. get_own_key() .. " setting finger 1 to ID " .. normalize_id(get_id(fingers[1])))
+    debug_print("called get_predecessor on my first finger, setting my predecessor to " .. normalize_id(get_id(predecessor)))
 
     -- create the rest of the finger table, finger by finger
     for finger_number = 2, node_id_size  do
+        debug_print("iterating over all fingers to initialize them, currently at finger " .. finger_number)
         -- the starting key of the new finger
         local start = get_finger_start(finger_number)
+        debug_print("finger number " .. finger_number .. " should start at " .. start)
 
         -- if the target key for the current finger is in the same range as the previous finger
         -- then the current finger targets the same node as the previous finger
-        if is_in_range(start, self_node, fingers[finger_number - 1]) then
+        if is_in_range(start, self_node, fingers[finger_number - 1], true, false) then
             debug_print("ID " .. get_own_key() .. " setting finger " .. finger_number .. " to copy of finger " .. finger_number - 1)
             fingers[finger_number] = fingers[finger_number - 1]
         else
@@ -287,41 +333,55 @@ function init_finger_table(anchor_node)
             debug_print("ID " .. get_own_key() .. " setting finger " .. finger_number .. " to ID " .. normalize_id(get_id(fingers[finger_number])))
         end
     end
+    debug_print("init_finger_table done")
 end
 
 -- update the fingers that point to this node when joining the ring
 function update_others()
+    debug_print("update_others")
     debug_print("ID " .. get_own_key() .. " setting predecessor on ID " .. normalize_id(get_id(fingers[1])) .. " to self")
     rpc.call(fingers[1], {"set_predecessor", self_node})
     for finger_number = 1, node_id_size do
+        debug_print("iterating over all fingers to update their finger tables, currently at finger " .. finger_number)
         -- calculate the source of the finger pointing at me, find its predecessor node
         -- and update the finger table on that node so the relevant finger points to me
+        debug_print("current finger should have the source of " .. get_finger_source(finger_number) .. ". calling find_predecessor to find the best node.")
         local finger_source = find_predecessor(get_finger_source(finger_number))
-        debug_print("ID " .. get_own_key() .. " calling update finger table " .. normalize_id(get_id(finger_source)) .. " ")
+        debug_print("found the best source node for current finger  " .. finger_number .. ": " .. normalize_id(get_id(finger_source)) .. ". calling update_finger_table on it with myself and finger_number " .. finger_number)
         rpc.call(finger_source, {"update_finger_table", self_node, finger_number})
     end
+    debug_print("update_others done")
 end
 
 -- update the finger table to point to a new value
 function update_finger_table(target_node, finger_number) 
+    debug_print("update_finger_table: target node " .. normalize_id(get_id(target_node)) .. " finger number " .. finger_number)
     -- if the current finger points to a node with the exact id that the finger should find the successor to
     -- we do not change the finger table, as it cannot get better
     local current_finger_id = normalize_id(get_id(fingers[finger_number]))
     local current_finger_start = get_finger_start(finger_number)
     local current_finger_is_perfect = current_finger_id == current_finger_start
+    debug_print("the current finger at position " .. finger_number .. " would ideally point to " .. current_finger_start .. ".")
+
+    if current_finger_is_perfect then debug_print("the current finger is already perfect") end
 
     -- only update the finger table if the new finger is better
     -- better means it points to an id that is closer to the finger start than the existing finger
     local target_node_id = normalize_id(get_id(target_node))
-    local new_finger_is_better = target_node_id >= current_finger_start and target_node_id < current_finger_id
+    local new_finger_is_better = is_in_range_numeric(target_node_id, current_finger_start, current_finger_id, true, false)
+    debug_print("the new finger should be better than the old one, so it should be at least " .. current_finger_start .. " but smaller than " .. current_finger_id)
+    if new_finger_is_better then debug_print("the new finger is better") end
 
     if not current_finger_is_perfect and new_finger_is_better then
+        debug_print("the current finger is not perfect and the new finger is better. we update the finger to the new one.")
         fingers[finger_number] = target_node
         debug_print("ID " .. get_own_key() .. " setting finger " .. finger_number .. " to ID " .. normalize_id(get_id(fingers[finger_number])))
 
         -- update the fingers on the predecessor node as well
+        -- debug_log("since we updated a finger, maybe it is better for the predecessor as well? calling predecessor " .. normalize_id(get_id(predecessor)) .. " to update_finger_table with target node " .. target_node_id .. " and finger number " .. finger_number)
         rpc.call(predecessor, {"update_finger_table", target_node, finger_number})
     end
+    debug_print("update_finger_table done")
 end
 
 
@@ -331,25 +391,34 @@ end
 
 -- test if the id is in the range between the two peers
 -- peer2 might have a lower id than peer 1, so we need to wrap around
-function is_in_range(id, peer1, peer2)
+function is_in_range(id, peer1, peer2, bottom_included, top_included)
     local first_point = normalize_id(get_id(peer1)) 
     local second_point = normalize_id(get_id(peer2))
-    return is_in_range_numeric(id, first_point, second_point)
+    return is_in_range_numeric(id, first_point, second_point, bottom_included, top_included)
 end
 
-function is_in_range_numeric(id, first_point, second_point)
-    local result = false
+-- checks if the id is in the given range
+-- since the range can be open or closed at either end, we give two booleans as params to indicate which way it works
+function is_in_range_numeric(id, first_point, second_point, bottom_included, top_included)
+    local result = nil
+    local bottom = nil
+    local top = nil
     if second_point == first_point then
         -- if the second point is the first point, the node is its own successor
         -- this means there is only one node, and any point is within its range
-        result = true 
+	bottom = true
+	top = true
     elseif second_point > first_point then
         -- if the second point is higher than the first point, there is no wrap around
         -- so we can compare simply
-        result = id > first_point and id <= second_point
+	if bottom_included then bottom = id >= first_point else bottom = id > first_point end
+	if top_included then top = id <= second_point else top = id < second_point end
+        result = bottom and top
     elseif second_point < first_point then
         -- here we have a wraparound around the 0 point
-        result = id > first_point or id <= second_point
+	if bottom_included then bottom = id >= first_point else bottom = id > first_point end
+	if top_included then top = id <= second_point else top = id < second_point end
+        result = bottom or top
     end
     return result
 end
@@ -365,7 +434,7 @@ end
 -- the maximum id size is 2 to the pwoer of node_id_size
 function normalize_id(id)
     local max_id = 2 ^ node_id_size
-    return (id + 1) % max_id
+    return (tonumber(id) + 1) % max_id
 end
 
 -- compute a hash of a string, then truncate it to the first node_id_size bits
@@ -569,6 +638,7 @@ function run_tests()
     -- run tests
     test_compute_hash()
     test_normalize_id()
+    test_is_in_range_numeric()
     test_is_in_range()
     test_get_finger_start()
     test_get_finger_source()
@@ -599,14 +669,36 @@ function test_normalize_id()
     assert(normalized_id == 1, "normalize id does not wrap around")
 end
 
+function test_is_in_range_numeric()
+    debug_print("is in range numeric...")
+    assert(is_in_range_numeric(2, 1, 3, false, false) == true, "2 between 1 and 3")
+    assert(is_in_range_numeric(1, 2, 3, false, false) == false, "1 not between 2 and 3")
+    assert(is_in_range_numeric(2, 2, 3, false, false) == false, "2 not between 2 and 3")
+    assert(is_in_range_numeric(2, 2, 3, true, false) == true, "2 between 2 and 3 including bottom")
+    assert(is_in_range_numeric(3, 2, 3, false, false) == false, "3 not between 2 and 3 ")
+    assert(is_in_range_numeric(3, 2, 3, false, true) == true, "3 between 2 and 3 including top")
+    assert(is_in_range_numeric(2, 3, 1, false, false) == false, "2 not between 3 and 1")
+    assert(is_in_range_numeric(4, 3, 2, false, false) == true, "4  between 3 and 1")
+    assert(is_in_range_numeric(1, 3, 2, false, false) == true, "1  between 3 and 2")
+    assert(is_in_range_numeric(3, 3, 2, true, false) == true, "1  between 3 and 2")
+end
+
 function test_is_in_range()
     a = {ip = "1", port = "1"} --24
     b = {ip = "1", port = "2"} --124
-    assert(is_in_range(50, a, b) == true, "50 between 24 and 124")
-    assert(is_in_range(50, b, a) == false, "50 not between 124 and 24")
-    assert(is_in_range(5, b, a) == true, "5 between 124 and 24")
-    assert(is_in_range(130, b, a) == true , "130 between 124 and 24")
-    assert(is_in_range(130, a, b) == false, "130 not between 24 and 124")
+    assert(is_in_range(50, a, b, false, false) == true, "50 between 24 and 124")
+    assert(is_in_range(50, b, a, false, false) == false, "50 not between 124 and 24")
+    assert(is_in_range(5, b, a, false, false) == true, "5 between 124 and 24")
+    assert(is_in_range(130, b, a, false, false) == true , "130 between 124 and 24")
+    assert(is_in_range(130, a, b, false, false) == false, "130 not between 24 and 124")
+    assert(is_in_range(24, a, b, true, true) == true, "24 is in range if bottom included")
+    assert(is_in_range(124, a, b, true, true) == true, "124 is in range if top is included")
+    assert(is_in_range(24, a, b, false, true) == false, "24 is not in range if bottom is not included")
+    assert(is_in_range(124, a, b, true, false) == false, "124 is not in range if top is not included")
+    assert(is_in_range(24, b, a, true, true) == true, "24 is not in range if bottom not included")
+    assert(is_in_range(124, b, a, true, true) == true, "124 is in range if top is included")
+    assert(is_in_range(24, b, a, false, true) == true, "24 is not in range if bottom is not included")
+    assert(is_in_range(124, b, a, true, false) == true, "124 is not in range if top is not included")
 end
 
 function test_get_finger_start()
@@ -618,8 +710,11 @@ function test_get_finger_start()
 end
 
 function test_get_finger_source()
-    assert(get_finger_source(1) == 24, "finger 1 source")
-    assert(get_finger_source(8) == 153, "finger 8 source")
+    debug_print("getting fingers for " .. get_own_key())
+    assert(get_finger_source(1) == 23, "finger 1 source")
+    assert(get_finger_source(2) == 21, "finger 1 source")
+    assert(get_finger_source(3) == 17, "finger 1 source")
+    assert(get_finger_source(4) == 9, "finger 4 source")
 end
 
 function assert(condition, message) 
@@ -643,4 +738,5 @@ else
     rpc.server(job.me.port)
     events.thread(main)  
 end
+
 events.run()
